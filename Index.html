@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .rule-card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 15px; overflow: hidden; }
+    .rule-card-header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .rule-card-title { font-weight: bold; font-size: 1rem; color: #222; }
+    .rule-card-arrow { color: #aaa; font-size: 1.1rem; transition: transform 0.2s; }
+    .rule-card-body { display: none; padding: 0 20px 15px; color: #444; font-size: 0.9rem; line-height: 1.8; white-space: pre-wrap; border-top: 1px solid #f0f0f0; padding-top: 12px; }
+    body { background-color: #f0f4f8; padding: 20px; font-family: 'Microsoft JhengHei', sans-serif; }
+    .main-container { max-width: 900px; margin: 0 auto; }
+    .header { text-align: center; padding: 30px 0 20px; }
+    .header h1 { color: #0d6efd; font-weight: bold; font-size: 2rem; }
+    .header p { color: #666; font-size: 1rem; }
+    .section-title { color: #333; font-weight: bold; font-size: 1.1rem; margin: 25px 0 15px; border-left: 4px solid #0d6efd; padding-left: 10px; }
+    .activity-card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 20px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; }
+    .activity-name { font-weight: bold; font-size: 1.05rem; color: #222; }
+    .activity-type { font-size: 0.8rem; color: #888; margin-top: 3px; }
+    .btn-group-custom { display: flex; gap: 8px; }
+    .query-card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 20px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: box-shadow 0.2s; }
+    .query-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.13); }
+    .query-icon { font-size: 1.8rem; margin-right: 15px; }
+    .query-info { flex: 1; }
+    .query-title { font-weight: bold; font-size: 1rem; color: #222; }
+    .query-desc { font-size: 0.85rem; color: #888; margin-top: 2px; }
+    .loading-text { text-align: center; color: #aaa; padding: 30px; }
+
+    /* ===== 最近活動 ===== */
+    .recent-card {
+      background: white; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 12px; overflow: hidden;
+    }
+    .recent-card a {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 20px; text-decoration: none; color: inherit;
+      transition: background 0.15s;
+    }
+    .recent-card a:hover { background: #f0f6ff; }
+    .recent-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .recent-title { font-weight: bold; font-size: 0.97rem; color: #0d6efd; }
+    .recent-sub { font-size: 0.8rem; color: #aaa; margin-top: 2px; }
+    .recent-arrow { margin-left: auto; color: #bbb; font-size: 1rem; }
+
+    /* ===== 缺額通知（低耗能：純折疊框，預設收合，chip 並排顯示） ===== */
+    .vacancy-accordion { background: white; border: 1px solid #ffc107; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 15px; overflow: hidden; }
+    .vacancy-accordion-header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fff8e1; color: #856404; font-weight: bold; }
+    .vacancy-accordion-body { display: none; padding: 6px 20px 16px; }
+    .vacancy-accordion-body.open { display: block; }
+    .vacancy-group-title { font-weight: bold; color: #0d6efd; margin: 10px 0 4px; font-size: 0.88rem; }
+    .vacancy-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+    .vacancy-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #fafafa; border: 1px solid #eee; border-radius: 16px;
+      padding: 4px 10px; font-size: 0.78rem; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .vacancy-chip:hover { background: #e8f4fd; border-color: #90caf9; }
+    .vacancy-chip .v-num { color: #dc3545; font-weight: bold; }
+
+    #toast-msg {
+      display: none; position: fixed; top: 30px; left: 50%; transform: translateX(-50%);
+      min-width: 280px; max-width: 90%; padding: 16px 24px; border-radius: 8px;
+      font-size: 16px; font-weight: bold; text-align: center; z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: opacity 0.5s ease;
+    }
+    #toast-msg.success { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+    #toast-msg.error   { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+  </style>
+</head>
+<body>
+  <div id="toast-msg"></div>
+  <div class="main-container">
+
+    <!-- 頁首 -->
+    <div class="header">
+      <h1>🔭 志工排班系統</h1>
+      <p>請選擇活動進行排班，或查詢個人資料</p>
+    </div>
+
+    <!-- 缺額通知（折疊框，預設收合，無資料時自動不顯示） -->
+    <div id="vacancyNotice"></div>
+
+    <!-- 活動排班區 -->
+    <div class="section-title">📋 活動排班</div>
+    <div id="activityList">
+      <div class="loading-text">載入中...</div>
+    </div>
+
+    <!-- 目前排班查詢區 -->
+    <div class="section-title">🗓️ 目前排班查詢（所有人）</div>
+    <div id="calendarList">
+      <div class="loading-text">載入中...</div>
+    </div>
+
+    <!-- 個人查詢區 -->
+    <div class="section-title">🔍 個人查詢</div>
+
+    <div class="query-card" onclick="goToQuery('schedule')">
+      <div class="query-icon">📅</div>
+      <div class="query-info">
+        <div class="query-title">我的排班查詢</div>
+        <div class="query-desc">查詢個人排班記錄</div>
+      </div>
+      <div>›</div>
+    </div>
+
+    <div class="query-card" onclick="goToQuery('hours')">
+      <div class="query-icon">⏱️</div>
+      <div class="query-info">
+        <div class="query-title">我的服勤時數查詢</div>
+        <div class="query-desc">查詢今年累計志願服務時數</div>
+      </div>
+      <div>›</div>
+    </div>
+
+    <!-- 排班規則區 -->
+    <div class="section-title">📋 排班規則</div>
+    <div id="rulesList">
+      <div class="loading-text">載入中...</div>
+    </div>
+
+    <!-- 最近活動區 -->
+    <div class="section-title">📄 最近活動</div>
+    <div id="recentList">
+      <div class="loading-text">載入中...</div>
+    </div>
+
+    <!-- 管理者入口 -->
+    <div class="section-title">⚙️ 管理者</div>
+    <div class="query-card" onclick="goToAdmin()">
+      <div class="query-icon">🔐</div>
+      <div class="query-info">
+        <div class="query-title">管理者後台</div>
+        <div class="query-desc">志工清單、活動設定、公告日期管理</div>
+      </div>
+      <div>›</div>
+    </div>
+
+  </div>
+
+  <script>
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          renderActivities(data.activities);
+          renderCalendarList(data.activities);
+          renderRules(data.rules);
+          renderRecentActivities(data.recentActivities);
+          renderVacancyNotice(data.vacancySummary);
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('activityList').innerHTML =
+            '<div class="loading-text">載入失敗：' + err + '</div>';
+          document.getElementById('calendarList').innerHTML = '';
+          document.getElementById('rulesList').innerHTML = '';
+          document.getElementById('recentList').innerHTML = '';
+        })
+        .getIndexDataFull();
+    };
+
+    // ==================================================
+    // 渲染函式
+    // ==================================================
+    function renderActivities(activities) {
+      var container = document.getElementById('activityList');
+      if (!activities || activities.length === 0) {
+        container.innerHTML = '<div class="loading-text">目前無開放活動</div>';
+        return;
+      }
+      var html = '';
+      activities.forEach(function(act) {
+        var typeLabel = act.type === '二觀型' ? '定期排班' : '場次活動';
+        var canReg    = act.openReg === '是';
+        var btnHtml   = canReg
+          ? '<button class="btn btn-primary btn-sm" onclick="goToForm(\'' + act.name + '\')">立即排班</button>'
+          : '<button class="btn btn-secondary btn-sm" disabled title="目前未開放報名">未開放</button>';
+        html += '<div class="activity-card">' +
+          '<div>' +
+            '<div class="activity-name">🌟 ' + act.name + '</div>' +
+            '<div class="activity-type">' + typeLabel + '</div>' +
+          '</div>' +
+          '<div class="btn-group-custom">' + btnHtml + '</div>' +
+        '</div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function renderCalendarList(activities) {
+      var container = document.getElementById('calendarList');
+      if (!activities || activities.length === 0) {
+        container.innerHTML = '<div class="loading-text">目前無活動</div>';
+        return;
+      }
+      var html = '';
+      activities.forEach(function(act) {
+        if (!act.calendarId) return;
+        html += '<div class="query-card" onclick="showCalendar(\'' + act.calendarId + '\', \'' + act.name + '\')">' +
+          '<div class="query-icon">📆</div>' +
+          '<div class="query-info">' +
+            '<div class="query-title">' + act.name + '</div>' +
+            '<div class="query-desc">查看目前排班月曆</div>' +
+          '</div>' +
+          '<div>›</div>' +
+        '</div>';
+      });
+      container.innerHTML = html || '<div class="loading-text">目前無活動可供查詢</div>';
+    }
+
+    function renderRules(rules) {
+      var container = document.getElementById('rulesList');
+      if (!rules || Object.keys(rules).length === 0) {
+        container.innerHTML = '<div class="loading-text">目前無規則說明</div>';
+        return;
+      }
+      var html = '';
+      Object.keys(rules).forEach(function(actName) {
+        html += '<div class="rule-card">' +
+          '<div class="rule-card-header" onclick="toggleRule(this)">' +
+            '<div class="rule-card-title">📌 ' + actName + '</div>' +
+            '<div class="rule-card-arrow">▼</div>' +
+          '</div>' +
+          '<div class="rule-card-body">' + rules[actName] + '</div>' +
+        '</div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function renderRecentActivities(items) {
+      var container = document.getElementById('recentList');
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="loading-text">目前無最近活動資料</div>';
+        return;
+      }
+      var html = '';
+      items.forEach(function(item) {
+        // 確保連結有 http/https 前綴
+        var url = item.url;
+        if (url && url.indexOf('http') !== 0) url = 'https://' + url;
+        html += '<div class="recent-card">' +
+          '<a href="' + escHtml(url) + '" target="_blank" rel="noopener">' +
+            '<div class="recent-icon">📄</div>' +
+            '<div>' +
+              '<div class="recent-title">' + escHtml(item.title) + '</div>' +
+              '<div class="recent-sub">點此開啟連結 ↗</div>' +
+            '</div>' +
+            '<div class="recent-arrow">›</div>' +
+          '</a>' +
+        '</div>';
+      });
+      container.innerHTML = html;
+    }
+
+    // ==================================================
+    // 缺額通知（折疊框，預設收合；無缺額時整個區塊不顯示）
+    // ==================================================
+    function renderVacancyNotice(slots) {
+      var container = document.getElementById('vacancyNotice');
+      if (!slots || slots.length === 0) { container.innerHTML = ''; return; }
+
+      var grouped = {};
+      slots.forEach(function(s) {
+        if (!grouped[s.activity]) grouped[s.activity] = [];
+        grouped[s.activity].push(s);
+      });
+
+      var bodyHtml = '';
+      Object.keys(grouped).forEach(function(actName) {
+        bodyHtml += '<div class="vacancy-group-title">【' + escHtml(actName) + '】</div>';
+        bodyHtml += '<div class="vacancy-chip-wrap">';
+        grouped[actName].forEach(function(s) {
+          var dp = s.date.split('/');
+          var shortDate = dp.length === 3 ? (dp[1] + '/' + dp[2]) : s.date; // 只顯示 月/日
+          bodyHtml += '<span class="vacancy-chip" onclick="goToForm(\'' + actName.replace(/'/g,"\\'") + '\')">' +
+            escHtml(shortDate) + ' ' + escHtml(s.slot) + '　缺<span class="v-num">' + s.shortage + '</span>' +
+          '</span>';
+        });
+        bodyHtml += '</div>';
+      });
+
+      container.innerHTML =
+        '<div class="vacancy-accordion">' +
+          '<div class="vacancy-accordion-header" onclick="var b=this.nextElementSibling; b.classList.toggle(\'open\'); this.querySelector(\'span:last-child\').style.transform = b.classList.contains(\'open\') ? \'rotate(180deg)\' : \'rotate(0deg)\';">' +
+            '<span>🔔 缺額通知（共 ' + slots.length + ' 個時段尚缺人力，點擊展開）</span><span style="transition:transform .2s;">▼</span>' +
+          '</div>' +
+          '<div class="vacancy-accordion-body">' + bodyHtml + '</div>' +
+        '</div>';
+    }
+
+    // ==================================================
+    // 導航
+    // ==================================================
+    function goToForm(activityName) {
+      window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>?page=form&activity=' + encodeURIComponent(activityName);
+    }
+
+    function goToQuery(type) {
+      window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>?page=query&type=' + type;
+    }
+
+    function showCalendar(calendarId, activityName) {
+      var src = encodeURIComponent(calendarId);
+      var calUrl = 'https://calendar.google.com/calendar/embed?src=' + src + '&ctz=Asia%2FTaipei&mode=MONTH';
+      window.open(calUrl, '_blank', 'width=900,height=700');
+    }
+
+    function goToAdmin() {
+      window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>?page=admin';
+    }
+
+    function toggleRule(header) {
+      var body  = header.nextElementSibling;
+      var arrow = header.querySelector('.rule-card-arrow');
+      if (body.style.display === 'block') {
+        body.style.display = 'none';
+        arrow.style.transform = 'rotate(0deg)';
+      } else {
+        body.style.display = 'block';
+        arrow.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, isSuccess, duration) {
+      var toast = document.getElementById('toast-msg');
+      toast.textContent = msg;
+      toast.className = isSuccess ? 'success' : 'error';
+      toast.style.display = 'block';
+      toast.style.opacity = '1';
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        setTimeout(function() { toast.style.display = 'none'; }, 500);
+      }, duration);
+    }
+  </script>
+</body>
+</html>

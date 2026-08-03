@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f0f4f8; padding: 20px; font-family: 'Microsoft JhengHei', sans-serif; }
+    .container { max-width: 650px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { color: #0d6efd; margin-bottom: 8px; text-align: center; font-weight: bold; }
+    .page-subtitle { text-align: center; color: #888; font-size: 0.9rem; margin-bottom: 25px; }
+    .form-label { font-weight: bold; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: white; cursor: pointer; text-decoration: none; font-size: 1.1rem; font-weight: bold; background-color: #0d6efd; padding: 10px 24px; border-radius: 8px; border: none; }
+    .back-link:hover { background-color: #0b5ed7; color: white; }
+    .name-display    { background:#e8f4fd; border:1px solid #bee3f8; border-radius:8px; padding:10px 15px; font-weight:bold; color:#0d6efd; display:none; margin-top:6px; }
+    .name-not-found  { background:#fde8e8; border:1px solid #f8bebe; border-radius:8px; padding:10px 15px; color:#dc3545; display:none; margin-top:6px; }
+
+    /* 結果區塊 */
+    .result-box { background:#f8f9fa; border-radius:8px; padding:20px; margin-top:20px; display:none; }
+    .result-title { font-weight:bold; font-size:1rem; color:#333; margin-bottom:15px; }
+    .section-label { font-weight:bold; font-size:0.92rem; padding:6px 10px; border-radius:6px; margin:16px 0 8px; }
+    .section-label.active-label { background:#e8f5e9; color:#2e7d32; }
+    .section-label.log-label    { background:#e3f2fd; color:#1565c0; }
+
+    .activity-group       { margin-bottom:14px; }
+    .activity-group-title { font-weight:bold; color:#0d6efd; margin-bottom:6px; font-size:0.92rem; }
+    .record-item { padding:7px 12px; background:white; border-radius:6px; margin-bottom:5px; font-size:0.88rem; border:1px solid #e9ecef; }
+    .total-hours { text-align:right; font-weight:bold; color:#198754; margin-top:10px; font-size:0.95rem; }
+
+    /* 操作紀錄 */
+    .log-item { padding:8px 12px; background:white; border-radius:6px; margin-bottom:6px; font-size:0.86rem; border-left:4px solid #dee2e6; }
+    .log-item.apply  { border-left-color:#28a745; }
+    .log-item.cancel { border-left-color:#dc3545; }
+    .log-meta  { color:#888; font-size:0.78rem; margin-top:3px; }
+    .log-badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-left:6px; }
+    .badge-apply  { background:#d1e7dd; color:#0f5132; }
+    .badge-cancel { background:#f8d7da; color:#842029; }
+    .empty-hint { color:#aaa; text-align:center; padding:12px; font-size:0.88rem; }
+
+    /* 時數區塊 */
+    .hours-display { background:#f8f9fa; border-radius:8px; margin-top:20px; display:none; overflow:hidden; }
+    .hours-header  { background:#0d6efd; color:white; text-align:center; padding:16px; font-size:1.1rem; font-weight:bold; }
+    .hours-body    { padding:16px 20px; }
+    .hours-info-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #e9ecef; font-size:0.95rem; }
+    .hours-row-label { color:#666; }
+    .hours-row-value { font-weight:bold; color:#222; }
+    /* 月份明細表格 */
+    .hours-table       { width:100%; border-collapse:collapse; margin-top:14px; font-size:0.9rem; }
+    .hours-table thead tr { background:#e9f0ff; color:#0d6efd; }
+    .hours-table th    { padding:9px 10px; text-align:center; font-weight:bold; border-bottom:2px solid #c5d8ff; white-space:nowrap; }
+    .hours-table td    { padding:8px 10px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+    .hours-table tbody tr:hover { background:#f9fbff; }
+    .hours-table .col-month { color:#0d6efd; font-weight:bold; white-space:nowrap; }
+    .hours-table .col-dates { color:#444; }
+    .hours-table .col-num   { text-align:center; color:#555; white-space:nowrap; }
+    .hours-table .col-hrs   { text-align:center; font-weight:bold; color:#198754; white-space:nowrap; }
+    .hours-table .row-total td { background:#e8f5e9; font-weight:bold; border-top:2px solid #a8d5b5; }
+    .hours-table .row-total .total-mins { color:#555; }
+    .hours-table .row-total .total-hrs  { color:#198754; font-size:1.05rem; }
+    /* 總計 */
+    .hours-grand-total { background:#e8f5e9; border-radius:8px; padding:14px 20px; margin-top:14px; display:flex; justify-content:space-between; align-items:center; }
+    .hours-grand-label { color:#555; font-size:0.9rem; }
+    .hours-grand-nums  { text-align:right; }
+    .hours-grand-hr    { font-size:1.8rem; font-weight:bold; color:#198754; line-height:1; }
+    .hours-grand-min   { font-size:0.82rem; color:#555; margin-top:2px; }
+    .hours-updated     { text-align:center; padding:12px 16px; color:#6c757d; font-size:0.85rem; border-top:1px solid #e9ecef; margin-top:10px; line-height:1.6; }
+
+    #toast-msg {
+      display:none; position:fixed; top:30px; left:50%; transform:translateX(-50%);
+      min-width:280px; max-width:90%; padding:16px 24px; border-radius:8px;
+      font-size:16px; font-weight:bold; text-align:center; z-index:9999;
+      box-shadow:0 4px 12px rgba(0,0,0,0.2); transition:opacity 0.5s ease;
+    }
+    #toast-msg.success { background-color:#d1e7dd; color:#0f5132; border:1px solid #badbcc; }
+    #toast-msg.error   { background-color:#f8d7da; color:#842029; border:1px solid #f5c2c7; }
+  </style>
+</head>
+<body>
+  <div id="toast-msg"></div>
+  <div class="container">
+    <button class="back-link" onclick="goBack()">← 返回首頁</button>
+
+    <!-- ===== 排班查詢 ===== -->
+    <div id="page-schedule" style="display:none;">
+      <h2>📅 我的排班查詢</h2>
+      <p class="page-subtitle">查詢個人排班紀錄與操作歷史</p>
+
+      <div class="mb-3">
+        <label class="form-label">志工編號：</label>
+        <input type="text" class="form-control" id="s-id" placeholder="請輸入志工編號" onblur="lookupNameSchedule()">
+        <div class="name-display"   id="s-nameDisplay"></div>
+        <div class="name-not-found" id="s-nameNotFound">找不到此編號，請確認後重新輸入。</div>
+      </div>
+
+      <button class="btn btn-primary w-100" onclick="querySchedule()">查詢排班紀錄</button>
+
+      <!-- 結果區 -->
+      <div class="result-box" id="scheduleResult">
+        <div class="result-title" id="scheduleResultTitle"></div>
+
+        <!-- 目前有效排班 -->
+        <div class="section-label active-label">✅ 目前有效排班（今天起）</div>
+        <div id="activeRecordsContent"></div>
+        <div class="total-hours" id="scheduleTotalHours"></div>
+
+        <!-- 操作紀錄 -->
+        <div class="section-label log-label" style="margin-top:20px;">📋 操作紀錄（全部，新到舊）</div>
+        <div id="logRecordsContent"></div>
+      </div>
+    </div>
+
+    <!-- ===== 時數查詢 ===== -->
+    <div id="page-hours" style="display:none;">
+      <h2>⏱️ 我的服勤時數查詢</h2>
+      <p class="page-subtitle">查詢累計志願服務實際值勤時數</p>
+
+      <div class="mb-3">
+        <label class="form-label">志工編號：</label>
+        <input type="text" class="form-control" id="h-id" placeholder="請輸入志工編號" onblur="lookupNameHours()">
+        <div class="name-display"   id="h-nameDisplay"></div>
+        <div class="name-not-found" id="h-nameNotFound">找不到此編號，請確認後重新輸入。</div>
+      </div>
+      <div class="row mb-3">
+        <div class="col">
+          <label class="form-label">起始月份：</label>
+          <input type="month" class="form-control" id="hoursStartMonth">
+        </div>
+        <div class="col">
+          <label class="form-label">結束月份：</label>
+          <input type="month" class="form-control" id="hoursEndMonth">
+        </div>
+      </div>
+      <button class="btn btn-primary w-100" onclick="queryHours()">查詢合計時數</button>
+
+      <div class="hours-display" id="hoursResult">
+        <div class="hours-header" id="hoursResultTitle">服勤時數統計</div>
+        <div class="hours-body">
+          <div class="hours-info-row"><span class="hours-row-label">姓名</span><span class="hours-row-value" id="hoursName"></span></div>
+          <div class="hours-info-row"><span class="hours-row-label">志工編號</span><span class="hours-row-value" id="hoursId"></span></div>
+          <div class="hours-info-row"><span class="hours-row-label">查詢期間</span><span class="hours-row-value" id="hoursPeriod"></span></div>
+          <!-- 月份分組動態區 -->
+          <div id="hoursMonthlyList"></div>
+          <!-- 總計 -->
+          <div class="hours-grand-total" id="hoursGrandTotal" style="display:none">
+            <div class="hours-grand-label">合計服勤時數</div>
+            <div class="hours-grand-nums">
+              <div class="hours-grand-hr"><span id="hoursGrandHr">0</span> 小時</div>
+              <div class="hours-grand-min">共 <span id="hoursGrandMin">0</span> 分鐘</div>
+            </div>
+          </div>
+        </div>
+        <div class="hours-updated" id="hoursUpdated"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    var s_name = '', h_name = '';
+
+    window.onload = function() {
+      google.script.url.getLocation(function(location) {
+        var type = location.parameter && location.parameter.type ? location.parameter.type : 'schedule';
+        document.getElementById(type === 'hours' ? 'page-hours' : 'page-schedule').style.display = 'block';
+      });
+      var now = new Date();
+      var ym  = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      document.getElementById('hoursStartMonth').value = ym;
+      document.getElementById('hoursEndMonth').value   = ym;
+    };
+
+    // ── 排班查詢：查名字 ──────────────────────────────────
+    function lookupNameSchedule() {
+      var id = document.getElementById('s-id').value.trim();
+      var nd = document.getElementById('s-nameDisplay'), nf = document.getElementById('s-nameNotFound');
+      nd.style.display = nf.style.display = 'none';
+      s_name = '';
+      if (!id) return;
+      google.script.run
+        .withSuccessHandler(function(name) {
+          if (name) { s_name = name; nd.textContent = '✓ ' + name; nd.style.display = 'block'; }
+          else { nf.style.display = 'block'; }
+        })
+        .withFailureHandler(function() { nf.style.display = 'block'; })
+        .getVolunteerNameById(id);
+    }
+
+    // ── 排班查詢：送出 ────────────────────────────────────
+    function querySchedule() {
+      var id = document.getElementById('s-id').value.trim();
+      if (!id || !s_name) { showToast("請輸入志工編號並確認姓名。", false, 5000); return; }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (!result) { showToast("查無資料，請確認編號是否正確。", false, 5000); return; }
+          renderScheduleResult(result);
+        })
+        .withFailureHandler(function(err) { showToast("查詢失敗：" + err, false, 5000); })
+        // startMonth / endMonth 傳入固定值（後端以今天為基準篩選）
+        .getPersonalSchedule(s_name, id, "2000-01-01", "2099-12-01");
+    }
+
+    // ── 渲染排班結果 ──────────────────────────────────────
+    function renderScheduleResult(result) {
+      var box = document.getElementById('scheduleResult');
+      box.style.display = 'block';
+      document.getElementById('scheduleResultTitle').textContent = result.name + ' 的排班查詢結果';
+
+      // 有效排班
+      var activeHTML = '';
+      if (!result.activeRecords || result.activeRecords.length === 0) {
+        activeHTML = '<div class="empty-hint">今天起無有效排班</div>';
+      } else {
+        var grouped = {};
+        result.activeRecords.forEach(function(r) {
+          if (!grouped[r.activity]) grouped[r.activity] = [];
+          grouped[r.activity].push(r);
+        });
+        Object.keys(grouped).forEach(function(actName) {
+          activeHTML += '<div class="activity-group">';
+          activeHTML += '<div class="activity-group-title">【' + actName + '】</div>';
+          grouped[actName].forEach(function(r) {
+            activeHTML += '<div class="record-item">📆 ' + r.date + addWeekday(r.date) + '　' + r.slot + '　(' + r.hours + ' 小時)</div>';
+          });
+          activeHTML += '</div>';
+        });
+      }
+      document.getElementById('activeRecordsContent').innerHTML = activeHTML;
+      document.getElementById('scheduleTotalHours').textContent =
+        result.activeRecords && result.activeRecords.length > 0
+          ? '合計：' + result.totalHours + ' 小時' : '';
+
+      // 操作紀錄
+      var logHTML = '';
+      if (!result.logRecords || result.logRecords.length === 0) {
+        logHTML = '<div class="empty-hint">今天起無操作紀錄</div>';
+      } else {
+        result.logRecords.forEach(function(r) {
+          var isApply   = r.operation === '申請排班';
+          var itemClass = isApply ? 'log-item apply' : 'log-item cancel';
+          var badge     = isApply
+            ? '<span class="log-badge badge-apply">申請</span>'
+            : '<span class="log-badge badge-cancel">取消</span>';
+          logHTML += '<div class="' + itemClass + '">' +
+            '<div>' +
+              escHtml(r.activity) + '　' + escHtml(r.slot) + badge +
+            '</div>' +
+            '<div class="log-meta">🕐 操作時間：' + escHtml(r.opTime) +
+              (r.notes ? '　備註：' + escHtml(r.notes) : '') +
+            '</div>' +
+          '</div>';
+        });
+      }
+      document.getElementById('logRecordsContent').innerHTML = logHTML;
+    }
+
+    // ── 日期加星期 ────────────────────────────────────────
+    function addWeekday(dateStr) {
+      var dp = dateStr.split('/');
+      if (dp.length < 3) return '';
+      var d = new Date(parseInt(dp[0]), parseInt(dp[1])-1, parseInt(dp[2]));
+      if (isNaN(d)) return '';
+      return '（' + ['日','一','二','三','四','五','六'][d.getDay()] + '）';
+    }
+
+    // ── 時數查詢 ──────────────────────────────────────────
+    function lookupNameHours() {
+      var id = document.getElementById('h-id').value.trim();
+      var nd = document.getElementById('h-nameDisplay'), nf = document.getElementById('h-nameNotFound');
+      nd.style.display = nf.style.display = 'none';
+      h_name = '';
+      if (!id) return;
+      google.script.run
+        .withSuccessHandler(function(name) {
+          if (name) { h_name = name; nd.textContent = '✓ ' + name; nd.style.display = 'block'; }
+          else { nf.style.display = 'block'; }
+        })
+        .withFailureHandler(function() { nf.style.display = 'block'; })
+        .getVolunteerNameById(id);
+    }
+
+    function queryHours() {
+      var id    = document.getElementById('h-id').value.trim();
+      var start = document.getElementById('hoursStartMonth').value;
+      var end   = document.getElementById('hoursEndMonth').value;
+      if (!id || !h_name) { showToast("請輸入志工編號並確認姓名。", false, 5000); return; }
+      if (!start || !end) { showToast("請選擇查詢月份範圍。", false, 5000); return; }
+      if (start > end)    { showToast("起始月份不可晚於結束月份。", false, 5000); return; }
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (!result) { showToast("查無資料，請確認編號是否正確。", false, 5000); return; }
+          document.getElementById('hoursResultTitle').textContent = result.name + ' 的服勤時數統計';
+          document.getElementById('hoursName').textContent        = result.name;
+          document.getElementById('hoursId').textContent          = id;
+          document.getElementById('hoursPeriod').textContent      = result.startMonth + ' 至 ' + result.endMonth;
+
+          // 月份分組
+          var listEl = document.getElementById('hoursMonthlyList');
+          listEl.innerHTML = '';
+          var months = result.monthlyData || [];
+          if (months.length === 0) {
+            listEl.innerHTML = '<div style="color:#888;padding:16px 0;text-align:center;">此期間無服勤紀錄</div>';
+          } else {
+            // 表頭
+            var tableHtml = '<table class="hours-table">';
+            tableHtml += '<thead><tr>';
+            tableHtml += '<th>月份</th><th>值勤日期</th><th>次數</th><th>分鐘</th><th>小時</th>';
+            tableHtml += '</tr></thead><tbody>';
+            var sumMins = 0, sumCount = 0;
+            months.forEach(function(m) {
+              sumMins  += m.mins  || 0;
+              sumCount += m.count || 0;
+              tableHtml += '<tr>';
+              tableHtml += '<td class="col-month">' + escHtml(m.month) + '</td>';
+              tableHtml += '<td class="col-dates">' + escHtml(m.dates || '—') + '</td>';
+              tableHtml += '<td class="col-num">' + (m.count || 0) + ' 次</td>';
+              tableHtml += '<td class="col-num">' + m.mins + '</td>';
+              tableHtml += '<td class="col-hrs">' + m.hours + '</td>';
+              tableHtml += '</tr>';
+            });
+            // 合計列
+            tableHtml += '<tr class="row-total">';
+            tableHtml += '<td class="col-month">合計</td>';
+            tableHtml += '<td class="col-dates">—</td>';
+            tableHtml += '<td class="col-num">' + sumCount + ' 次</td>';
+            tableHtml += '<td class="col-num total-mins">' + sumMins + '</td>';
+            tableHtml += '<td class="col-hrs total-hrs">' + (sumMins / 60).toFixed(1) + '</td>';
+            tableHtml += '</tr>';
+            tableHtml += '</tbody></table>';
+            listEl.innerHTML = tableHtml;
+          }
+
+          // 總計
+          document.getElementById('hoursGrandHr').textContent  = result.grandTotalHours;
+          document.getElementById('hoursGrandMin').textContent = result.grandTotalMins;
+          document.getElementById('hoursGrandTotal').style.display = 'flex';
+          document.getElementById('hoursUpdated').textContent =
+            '以上資料更新至' + result.latestMonth + '，最後資料仍然以館方記錄為主。';
+          document.getElementById('hoursResult').style.display = 'block';
+        })
+        .withFailureHandler(function(err) { showToast("查詢失敗：" + err, false, 5000); })
+        .getVolunteerHours(h_name, id, start + "-01", end + "-01");
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function goBack() { window.location.replace('<?= ScriptApp.getService().getUrl() ?>'); }
+
+    function showToast(msg, isSuccess, duration) {
+      var toast = document.getElementById('toast-msg');
+      toast.textContent = msg; toast.className = isSuccess ? 'success' : 'error';
+      toast.style.display = 'block'; toast.style.opacity = '1';
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        setTimeout(function() { toast.style.display = 'none'; }, 500);
+      }, duration || 5000);
+    }
+  </script>
+</body>
+</html>

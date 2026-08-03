@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f0f4f8; padding: 20px; font-family: 'Microsoft JhengHei', sans-serif; }
+    .container { max-width: 600px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { color: #0d6efd; margin-bottom: 25px; text-align: center; font-weight: bold; }
+    .form-label { font-weight: bold; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: white; cursor: pointer; text-decoration: none; font-size: 1.1rem; font-weight: bold; background-color: #0d6efd; padding: 10px 24px; border-radius: 8px; border: none; }
+    .back-link:hover { background-color: #0b5ed7; text-decoration: none; color: white; }
+    #loading { display: none; text-align: center; margin-top: 10px; color: #666; }
+    .name-display { background: #e8f4fd; border: 1px solid #bee3f8; border-radius: 8px; padding: 10px 15px; font-weight: bold; color: #0d6efd; display: none; margin-top: 6px; }
+    .name-not-found { background: #fde8e8; border: 1px solid #f8bebe; border-radius: 8px; padding: 10px 15px; color: #dc3545; display: none; margin-top: 6px; }
+    #toast-msg {
+      display: none; position: fixed; top: 30px; left: 50%; transform: translateX(-50%);
+      min-width: 280px; max-width: 90%; padding: 16px 24px; border-radius: 8px;
+      font-size: 16px; font-weight: bold; text-align: center; z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: opacity 0.5s ease;
+      white-space: pre-line;
+    }
+    #toast-msg.success { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+    #toast-msg.error   { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+
+    #conflictAlert {
+      display: none; margin-top: 10px; padding: 12px 16px;
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;
+      color: #856404; font-size: 0.9rem; white-space: pre-line;
+    }
+    #conflictAlert .conflict-title { font-weight: bold; margin-bottom:4px; }
+
+    #warningAlert {
+      display: none; margin-top: 10px; padding: 12px 16px;
+      background: #e8f4fd; border: 1px solid #90caf9; border-radius: 8px;
+      color: #1565c0; font-size: 0.9rem; white-space: pre-line;
+    }
+    #warningAlert .warning-title { font-weight: bold; margin-bottom:4px; }
+
+    .cal-wrapper { border: 1px solid #dee2e6; border-radius: 10px; overflow: hidden; user-select: none; }
+    .cal-header  { display: flex; align-items: center; justify-content: space-between; background: #0d6efd; color: white; padding: 10px 16px; font-weight: bold; }
+    .cal-header button { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; padding: 0 6px; line-height: 1; }
+    .cal-header button:hover { opacity: 0.75; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .cal-dow  { text-align: center; padding: 6px 2px; font-size: 0.75rem; font-weight: bold; color: #666; background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
+    .cal-dow.sun { color: #e74c3c; }
+    .cal-dow.sat { color: #2980b9; }
+    .cal-cell { text-align: center; padding: 4px 2px; min-height: 52px; border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; cursor: default; position: relative; }
+    .cal-cell .cal-date { font-size: 0.82rem; font-weight: bold; margin-bottom: 2px; }
+    .cal-cell.empty { background: #fafafa; }
+    .cal-cell.past  { background: #f5f5f5; opacity: 0.5; }
+    .cal-cell.locked { background: #eeeeee; opacity: 0.6; cursor: not-allowed; }
+    .cal-cell.locked .cal-date { color: #999; }
+    .cal-cell.has-slots { cursor: pointer; background: #fff; }
+    .cal-cell.has-slots:hover { background: #e8f4fd; }
+    .cal-cell.selected { background: #0d6efd !important; }
+    .cal-cell.selected .cal-date { color: white; }
+    .cal-cell.selected .slot-dot { background: white !important; }
+    .cal-cell.full  { background: #fff5f5; }
+    .cal-cell.conflict { background: #fff3cd !important; cursor: pointer; }
+    .cal-cell.conflict .cal-date { color: #856404; }
+    .cal-cell.conflict-warning { background: #e8f4fd !important; cursor: pointer; }
+    .cal-cell.conflict-warning .cal-date { color: #1565c0; }
+    .slot-dots { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; margin-top: 2px; }
+    .slot-dot  { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot-open  { background: #28a745; }
+    .dot-part  { background: #fd7e14; }
+    .dot-full  { background: #dc3545; }
+    .dot-conflict { background: #ffc107; }
+    .dot-warning  { background: #2196f3; }
+    .slot-list { margin-top: 10px; display: none; }
+    .slot-btn  { display: block; width: 100%; text-align: left; padding: 8px 12px; margin-bottom: 6px; border: 1.5px solid #dee2e6; border-radius: 8px; background: white; cursor: pointer; font-size: 0.9rem; transition: all 0.15s; }
+    .slot-btn:hover  { border-color: #0d6efd; background: #e8f4fd; }
+    .slot-btn.active { border-color: #0d6efd; background: #0d6efd; color: white; font-weight: bold; }
+    .slot-btn.full   { background: #f8d7da; color: #842029; border-color: #f5c2c7; cursor: not-allowed; }
+    .slot-btn .slot-status { float: right; font-size: 0.78rem; opacity: 0.8; }
+    .cal-loading { text-align: center; color: #aaa; padding: 20px; }
+    .cal-nav-months { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .cal-nav-months button { flex: 1; min-width: 100px; padding: 6px; border: 1.5px solid #dee2e6; border-radius: 8px; background: white; cursor: pointer; font-size: 0.88rem; transition: all 0.15s; }
+    .cal-nav-months button.active { border-color: #0d6efd; background: #0d6efd; color: white; font-weight: bold; }
+    .cal-nav-months button:hover:not(.active) { border-color: #0d6efd; background: #e8f4fd; }
+
+    #selectedSlotsBox {
+      display: none; margin-top: 10px; padding: 10px 14px;
+      background: #e8f4fd; border-radius: 8px; color: #0d6efd;
+      font-size: 0.9rem; font-weight: bold;
+    }
+    #selectedSlotsBox .slot-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #0d6efd; color: white; border-radius: 20px;
+      padding: 3px 10px; margin: 3px 4px 3px 0; font-size: 0.82rem; font-weight: normal;
+    }
+    #selectedSlotsBox .slot-tag .remove-tag {
+      cursor: pointer; font-weight: bold; font-size: 0.9rem; line-height: 1; opacity: 0.8;
+    }
+    #selectedSlotsBox .slot-tag .remove-tag:hover { opacity: 1; }
+    .multi-hint { font-size: 0.8rem; color: #888; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div id="toast-msg"></div>
+  <div class="container">
+
+    <button class="back-link" onclick="goBack()">← 返回首頁</button>
+    <h2 id="formTitle">排班申請</h2>
+
+    <form id="volunteerForm">
+      <input type="hidden" id="activityName" value="<?= activityName ?>">
+      <input type="hidden" id="activityType" value="<?= activityType ?>">
+      <input type="hidden" id="volunteerName" value="">
+      <input type="hidden" id="selectedSlot" value="">
+
+      <div class="mb-3">
+        <label class="form-label">活動：</label>
+        <div class="form-control-plaintext fw-bold text-primary" id="activityDisplay"></div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">志工編號：</label>
+        <input type="text" class="form-control" id="volunteerId" placeholder="請輸入志工編號" required onblur="lookupName()">
+        <div class="name-display"    id="nameDisplay"></div>
+        <div class="name-not-found"  id="nameNotFound">找不到此編號，請確認後重新輸入。</div>
+      </div>
+
+      <!-- 公告提示框（統一：完全未開放 or 有尚未開放的批次）-->
+      <div id="pendingAnnouncesBox" style="display:none; margin-bottom:16px; padding:16px 18px;
+        background:#fff3cd; border:1px solid #ffc107; border-radius:8px; color:#856404;">
+        <div style="font-weight:bold; font-size:1rem; margin-bottom:8px;">⏰ 排班開放時程</div>
+        <div id="pendingAnnouncesContent" style="font-size:0.9rem; line-height:2;"></div>
+        <div style="font-size:0.82rem; color:#a07000; margin-top:6px;">（屆時請重新整理您的網頁）</div>
+      </div>
+
+      <!-- 舊版相容（隱藏，供 JS 相容用）-->
+      <div id="notOpenBox"    style="display:none;"></div>
+      <div id="partialOpenBox" style="display:none;"></div>
+
+      <div id="calendarSection" class="mb-3" style="display:none;">
+        <label class="form-label">選擇排班日期與時段：</label>
+        <div class="multi-hint">💡 可點選同一天的多個時段一次申請</div>
+
+        <div id="conflictAlert">
+          <div class="conflict-title">⚠️ 注意：此日期有時間重疊衝突</div>
+          <div id="conflictDetail"></div>
+        </div>
+
+        <div id="warningAlert">
+          <div class="warning-title">ℹ️ 提醒：您當天已有其他活動排班</div>
+          <div id="warningDetail"></div>
+        </div>
+
+        <div class="cal-nav-months" id="calNavMonths"></div>
+
+        <div class="cal-wrapper">
+          <div class="cal-header">
+            <button type="button" onclick="calPrevMonth()">&#8249;</button>
+            <span id="calMonthLabel"></span>
+            <button type="button" onclick="calNextMonth()">&#8250;</button>
+          </div>
+          <div class="cal-grid" id="calDowRow">
+            <div class="cal-dow sun">日</div>
+            <div class="cal-dow">一</div>
+            <div class="cal-dow">二</div>
+            <div class="cal-dow">三</div>
+            <div class="cal-dow">四</div>
+            <div class="cal-dow">五</div>
+            <div class="cal-dow sat">六</div>
+          </div>
+          <div class="cal-grid" id="calBody">
+            <div class="cal-loading" style="grid-column:1/8;">請先輸入志工編號</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; padding:8px 12px; background:#f8f9fa; border-radius:8px; font-size:0.82rem; color:#555;">
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#28a745;margin-right:4px;vertical-align:middle;"></span>可排班</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fd7e14;margin-right:4px;vertical-align:middle;"></span>部分已滿</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc3545;margin-right:4px;vertical-align:middle;"></span>已滿</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ffc107;margin-right:4px;vertical-align:middle;"></span>時間重疊衝突</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2196f3;margin-right:4px;vertical-align:middle;"></span>當天有其他排班</span>
+        </div>
+
+        <div class="slot-list" id="slotList"></div>
+
+        <div id="selectedSlotsBox">
+          <div style="margin-bottom:6px;">✓ 已選擇 <span id="selectedCount">0</span> 個時段：</div>
+          <div id="selectedTagsContainer"></div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">備註（選填）：</label>
+        <textarea class="form-control" id="notes" rows="3"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" id="submitBtn">提交申請</button>
+      <div id="loading">處理中，請稍候...</div>
+    </form>
+  </div>
+
+  <script>
+    var activityName = document.getElementById('activityName').value;
+    var activityType = document.getElementById('activityType').value;
+
+    var calYear    = 0;
+    var calMonth   = 0;
+    var monthData  = {};
+    var selectedDate = null;
+    var availableMonths = [];
+    var selectedSlots = [];
+    var conflictCache = {};
+    var calendarLocked = false;
+
+    // ★ 新增：記錄已開放的月份（來自後端），用於初始化月份按鈕
+    var openMonthsFromServer = [];
+
+    window.onload = function() {
+      document.getElementById('activityDisplay').textContent = activityName;
+      document.getElementById('formTitle').textContent = activityName + ' 排班申請';
+      var now = new Date();
+      calYear  = now.getFullYear();
+      calMonth = now.getMonth();
+      checkAndRenderCalendar();
+    };
+
+    /**
+     * 向後端查詢開放時間狀態，並顯示排班開放時程提示
+     */
+    function checkAndRenderCalendar() {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          document.getElementById('pendingAnnouncesBox').style.display = 'none';
+
+          if (res && !res.open) {
+            // ── 完全未開放 ──
+            if (res.openTime) {
+              // 場次型：直接顯示最早開放時間
+              showNotOpenMessage(res.openTime);
+            } else {
+              // 二觀型：查詢所有待開放公告
+              google.script.run
+                .withSuccessHandler(function(pending) {
+                  showPendingAnnounces(pending);
+                })
+                .withFailureHandler(function() {})
+                .getPendingAnnounces(activityName);
+            }
+
+            document.getElementById('calendarSection').style.display = '';
+            calendarLocked = true;
+            renderCalendar();
+
+          } else {
+            // ── 至少部分已開放 ──
+            document.getElementById('calendarSection').style.display = '';
+            calendarLocked = false;
+
+            if (res && res.openMonths && res.openMonths.length > 0) {
+              openMonthsFromServer = res.openMonths;
+              openMonthsFromServer.forEach(function(m) {
+                if (availableMonths.indexOf(m) < 0) availableMonths.push(m);
+              });
+              availableMonths.sort();
+              renderNavMonths();
+
+              var nearestMonth = findNearestOpenMonth(openMonthsFromServer);
+              if (nearestMonth) {
+                var parts = nearestMonth.split("/");
+                calYear  = parseInt(parts[0]);
+                calMonth = parseInt(parts[1]) - 1;
+              }
+
+              // 查詢是否還有尚未開放的批次，顯示提示（二觀型）
+              google.script.run
+                .withSuccessHandler(function(pending) {
+                  if (pending && pending.length > 0) showPendingAnnounces(pending);
+                })
+                .withFailureHandler(function() {})
+                .getPendingAnnounces(activityName);
+            }
+
+            // 場次型：顯示待開放場次的提示
+            if (res && res.pendingSessionTimes && res.pendingSessionTimes.length > 0) {
+              showPendingSessionTimes(res.pendingSessionTimes);
+              window._pendingSessionShown = true;
+            }
+
+            var id = document.getElementById('volunteerId').value.trim();
+            if (id && document.getElementById('volunteerName').value) {
+              loadMonthData(calYear, calMonth);
+            } else {
+              renderCalendar();
+            }
+          }
+        })
+        .withFailureHandler(function() {
+          document.getElementById('calendarSection').style.display = '';
+          calendarLocked = false;
+          renderCalendar();
+        })
+        .getActivityOpenTime(activityName);
+    }
+
+    /**
+     * 顯示場次型待開放提示（已有場次開放，但還有未開放的月份）
+     */
+    function showPendingSessionTimes(pendingTimes) {
+      if (!pendingTimes || pendingTimes.length === 0) return;
+      var box     = document.getElementById('pendingAnnouncesBox');
+      var content = document.getElementById('pendingAnnouncesContent');
+      // 如果已有內容（二觀型公告），追加；否則直接寫入
+      var html = '';
+      pendingTimes.forEach(function(p) {
+        var monthLabels = p.months.map(function(m) {
+          var parts = m.split('/');
+          return parts[0] + ' 年 ' + parts[1] + ' 月';
+        }).join('、');
+        html += '本單位預計於 <strong>' + escHtmlFront(p.openTime) + '</strong> 開放 <strong>' + escHtmlFront(monthLabels) + '</strong> 的排班申請<br>';
+      });
+      // 只在尚未顯示相同內容時才更新
+      if (content.innerHTML.indexOf(html.substring(0, 20)) < 0) {
+        content.innerHTML += html;
+        box.style.display = 'block';
+      }
+    }
+
+    /**
+     * 顯示場次型活動尚未開放的提示（直接用 openTime）
+     */
+    function showNotOpenMessage(openTime) {
+      var box     = document.getElementById('pendingAnnouncesBox');
+      var content = document.getElementById('pendingAnnouncesContent');
+      content.innerHTML = '本單位預計於 <strong>' + escHtmlFront(openTime) + '</strong> 開放排班申請';
+      box.style.display = 'block';
+    }
+
+    /**
+     * 顯示待開放公告提示（二觀型）
+     */
+    function showPendingAnnounces(pending) {
+      if (!pending || pending.length === 0) return;
+      var box = document.getElementById('pendingAnnouncesBox');
+      var content = document.getElementById('pendingAnnouncesContent');
+      var html = '';
+      pending.forEach(function(p) {
+        var monthLabels = p.months.map(function(m) {
+          var parts = m.split('/');
+          return parts[0] + ' 年 ' + parts[1] + ' 月';
+        }).join('、');
+        html += '本單位預計於 <strong>' + escHtmlFront(p.openTime) + '</strong> 開放 <strong>' + escHtmlFront(monthLabels) + '</strong> 的排班申請<br>';
+      });
+      content.innerHTML = html;
+      box.style.display = 'block';
+    }
+
+    function escHtmlFront(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    /**
+     * ★ 新增：從開放月份清單中找最近的未來月份
+     */
+    function findNearestOpenMonth(months) {
+      var now = new Date();
+      var currentKey = now.getFullYear() + "/" + (now.getMonth() + 1);
+      var sorted = months.slice().sort();
+      // 優先找 >= 當月的
+      for (var i = 0; i < sorted.length; i++) {
+        if (sorted[i] >= currentKey) return sorted[i];
+      }
+      // 全都是過去月份就取最後一個
+      return sorted[sorted.length - 1] || null;
+    }
+
+    // ==================================================
+    // 志工編號查詢（兩階段：快速顯示名字，再載月曆）
+    // ==================================================
+    function lookupName() {
+      var id = document.getElementById('volunteerId').value.trim();
+      var nameDisplay  = document.getElementById('nameDisplay');
+      var nameNotFound = document.getElementById('nameNotFound');
+      nameDisplay.style.display  = 'none';
+      nameNotFound.style.display = 'none';
+      document.getElementById('volunteerName').value = '';
+      clearSelectedSlot();
+      hideAllAlerts();
+      conflictCache = {};
+
+      if (!id) return;
+
+      // 階段1：快速查名字（只讀志工名單，很快）
+      google.script.run
+        .withSuccessHandler(function(name) {
+          if (!name) { nameNotFound.style.display = 'block'; return; }
+
+          document.getElementById('volunteerName').value = name;
+          nameDisplay.textContent   = '✓ ' + name;
+          nameDisplay.style.display = 'block';
+
+          // 階段2：合併查詢開放狀態+月曆+公告（背景載入）
+          loadCalendarData();
+        })
+        .withFailureHandler(function() { nameNotFound.style.display = 'block'; })
+        .getVolunteerNameById(id);
+    }
+
+    /**
+     * 合併查詢：開放狀態 + 最近月份月曆 + 待開放公告
+     * 原本需要3次後端呼叫，現在只需1次
+     */
+    function loadCalendarData() {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res) { renderCalendar(); return; }
+
+          // ★ 不在這裡清除提示框，讓提示保持顯示
+          document.getElementById('calendarSection').style.display = '';
+
+          if (res.openStatus && !res.openStatus.open) {
+            calendarLocked = true;
+            document.getElementById('pendingAnnouncesBox').style.display = 'none';
+            if (res.openStatus.openTime) {
+              showNotOpenMessage(res.openStatus.openTime);
+            } else if (res.pendingAnnounces && res.pendingAnnounces.length > 0) {
+              showPendingAnnounces(res.pendingAnnounces);
+            }
+            renderCalendar();
+            return;
+          }
+
+          calendarLocked = false;
+
+          if (res.openStatus && res.openStatus.openMonths && res.openStatus.openMonths.length > 0) {
+            openMonthsFromServer = res.openStatus.openMonths;
+            openMonthsFromServer.forEach(function(m) {
+              if (availableMonths.indexOf(m) < 0) availableMonths.push(m);
+            });
+            availableMonths.sort();
+            // ★ 只在用戶尚未手動切換月份時，才跳到最近開放月份
+            if (!window._userNavigated && res.targetYear && res.targetMonth) {
+              calYear  = res.targetYear;
+              calMonth = res.targetMonth - 1;
+            }
+          }
+
+          if (res.pendingAnnounces && res.pendingAnnounces.length > 0) {
+            showPendingAnnounces(res.pendingAnnounces);
+          }
+
+          // 場次型：顯示待開放場次提示（只顯示一次）
+          if (res.openStatus && res.openStatus.pendingSessionTimes && res.openStatus.pendingSessionTimes.length > 0) {
+            if (!window._pendingSessionShown) {
+              showPendingSessionTimes(res.openStatus.pendingSessionTimes);
+              window._pendingSessionShown = true;
+            }
+          }
+
+          // 直接用後端回傳的月曆資料，存進正確的 key
+          if (res.monthSlots && Object.keys(res.monthSlots).length > 0) {
+            // ★ 用後端回傳的 targetYear/targetMonth 當 key，不用前台當前月份
+            var serverYear  = res.targetYear  || calYear;
+            var serverMonth = res.targetMonth || (calMonth + 1);
+            var key = serverYear + "/" + serverMonth;
+            monthData[key] = res.monthSlots;
+            // 同步前台月份到後端回傳的月份（只在未手動切換時）
+            if (!window._userNavigated) {
+              calYear  = serverYear;
+              calMonth = serverMonth - 1;
+            }
+            updateAvailableMonths();
+            renderCalendar();
+          } else {
+            loadMonthData(calYear, calMonth);
+          }
+        })
+        .withFailureHandler(function() {
+          document.getElementById('calendarSection').style.display = '';
+          calendarLocked = false;
+          renderCalendar();
+        })
+        .getCalendarData(activityName);
+    }
+
+    // ==================================================
+    // 衝突警示
+    // ==================================================
+    function showConflictAlert(lines) {
+      document.getElementById('conflictDetail').textContent = lines.join("\n");
+      document.getElementById('conflictAlert').style.display = 'block';
+    }
+    function hideConflictAlert() {
+      document.getElementById('conflictAlert').style.display = 'none';
+      document.getElementById('conflictDetail').textContent  = '';
+    }
+    function showWarningAlert(lines) {
+      document.getElementById('warningDetail').textContent = lines.map(function(c){ return '  • ' + c; }).join("\n");
+      document.getElementById('warningAlert').style.display = 'block';
+    }
+    function hideWarningAlert() {
+      document.getElementById('warningAlert').style.display = 'none';
+      document.getElementById('warningDetail').textContent  = '';
+    }
+    function hideAllAlerts() {
+      hideConflictAlert();
+      hideWarningAlert();
+    }
+
+    function checkConflict(dateStr, callback) {
+      var id = document.getElementById('volunteerId').value.trim();
+      if (!id) { callback(null); return; }
+      if (conflictCache.hasOwnProperty(dateStr)) { callback(conflictCache[dateStr]); return; }
+      google.script.run
+        .withSuccessHandler(function(result) { conflictCache[dateStr] = result; callback(result); })
+        .withFailureHandler(function() { conflictCache[dateStr] = null; callback(null); })
+        .checkDateConflictForVolunteer(id, activityName, dateStr);
+    }
+
+    // ==================================================
+    // ★ 月曆：載入指定月份資料（修正 cache 邏輯）
+    // ==================================================
+    function loadMonthData(year, month) {
+      var key = year + "/" + (month + 1);
+
+      // ★ cache 存在且有資料才使用，空物件強制重新載入
+      if (monthData[key] && Object.keys(monthData[key]).length > 0) {
+        calYear  = year;
+        calMonth = month;
+        renderCalendar();
+        restorePendingNotice();
+        return;
+      }
+
+      // 清除空的 cache，確保重新載入
+      delete monthData[key];
+
+      document.getElementById('calBody').innerHTML =
+        '<div class="cal-loading" style="grid-column:1/8;">載入中...</div>';
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          monthData[key] = data || {};
+          calYear  = year;
+          calMonth = month;
+          updateAvailableMonths();
+          renderCalendar();
+          restorePendingNotice();
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('calBody').innerHTML =
+            '<div class="cal-loading" style="grid-column:1/8; color:#dc3545;">載入失敗</div>';
+          showToast("載入時段失敗：" + err, false, 5000);
+        })
+        .getMonthSlots(activityName, year, month + 1);
+    }
+
+    /**
+     * ★ 切換月份後恢復提示框（如果有暫存的提示內容）
+     */
+    function restorePendingNotice() {
+      var box     = document.getElementById('pendingAnnouncesBox');
+      var content = document.getElementById('pendingAnnouncesContent');
+      if (content.innerHTML && content.innerHTML.trim()) {
+        box.style.display = 'block';
+      }
+    }
+
+    function updateAvailableMonths() {
+      // ★ 修正：把後端回傳的開放月份也納入（即使尚未載入資料）
+      var monthSet = {};
+      openMonthsFromServer.forEach(function(m) { monthSet[m] = true; });
+      Object.keys(monthData).forEach(function(k) {
+        if (Object.keys(monthData[k]).length > 0) monthSet[k] = true;
+      });
+      availableMonths = Object.keys(monthSet).sort();
+      renderNavMonths();
+    }
+
+    function renderNavMonths() {
+      var container  = document.getElementById('calNavMonths');
+      var currentKey = calYear + "/" + (calMonth + 1);
+      var html = '';
+      availableMonths.forEach(function(k) {
+        var parts  = k.split("/");
+        var label  = parts[0] + "年" + parts[1] + "月";
+        var active = k === currentKey ? ' active' : '';
+        html += '<button type="button" class="' + active + '" onclick="switchNavMonth(\'' + k + '\')">' + label + '</button>';
+      });
+      container.innerHTML = html;
+    }
+
+    function switchNavMonth(key) {
+      var parts = key.split("/");
+      calYear  = parseInt(parts[0]);
+      calMonth = parseInt(parts[1]) - 1;
+      window._userNavigated = true;
+      loadMonthData(calYear, calMonth);
+    }
+
+    // ==================================================
+    // 月曆：渲染
+    // ==================================================
+    function renderCalendar() {
+      var key      = calYear + "/" + (calMonth + 1);
+      var dayData  = monthData[key] || null;
+      var now      = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      document.getElementById('calMonthLabel').textContent =
+        calYear + " 年 " + (calMonth + 1) + " 月";
+
+      var firstDay    = new Date(calYear, calMonth, 1).getDay();
+      var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      var html = '';
+
+      for (var b = 0; b < firstDay; b++) html += '<div class="cal-cell empty"></div>';
+
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dateStr  = calYear + "/" + (calMonth + 1) + "/" + d;
+        var cellDate = new Date(calYear, calMonth, d);
+        var isPast   = cellDate < now;
+        var slots    = dayData ? (dayData[dateStr] || []) : [];
+        var hasSlots = slots.length > 0;
+
+        var cached      = conflictCache.hasOwnProperty(dateStr) ? conflictCache[dateStr] : null;
+        var hasBlocked  = cached && cached.blocked && cached.blocked.length > 0;
+        var hasWarning  = cached && cached.warning && cached.warning.length > 0;
+
+        var cellClass = 'cal-cell';
+        if (calendarLocked) {
+          cellClass += isPast ? ' past' : ' locked';
+        } else if (isPast || !hasSlots) {
+          cellClass += isPast ? ' past' : ' empty';
+        } else if (hasBlocked) {
+          cellClass += ' has-slots conflict';
+        } else if (hasWarning) {
+          cellClass += ' has-slots conflict-warning';
+        } else {
+          cellClass += ' has-slots';
+          var allFull = slots.every(function(s) { return s.split(":").pop() === "已滿"; });
+          if (allFull) cellClass += ' full';
+        }
+        if (!calendarLocked && selectedDate === dateStr) cellClass += ' selected';
+
+        var dotsHtml = '';
+        if (!calendarLocked && hasSlots && !isPast) {
+          dotsHtml = '<div class="slot-dots">';
+          if (hasBlocked) {
+            dotsHtml += '<span class="slot-dot dot-conflict"></span>';
+          } else if (hasWarning) {
+            dotsHtml += '<span class="slot-dot dot-warning"></span>';
+          } else {
+            slots.forEach(function(s) {
+              var status   = s.split(":").pop();
+              var dotClass = status === "已滿" ? 'dot-full' : status === "部分排班" ? 'dot-part' : 'dot-open';
+              dotsHtml += '<span class="slot-dot ' + dotClass + '"></span>';
+            });
+          }
+          dotsHtml += '</div>';
+        }
+
+        var clickAttr = (!calendarLocked && hasSlots && !isPast)
+          ? 'onclick="selectDate(\'' + dateStr + '\')"' : '';
+
+        html += '<div class="' + cellClass + '" ' + clickAttr + '>' +
+          '<div class="cal-date">' + d + '</div>' + dotsHtml + '</div>';
+      }
+
+      document.getElementById('calBody').innerHTML = html;
+      renderNavMonths();
+
+      if (selectedDate) {
+        var selParts = selectedDate.split("/");
+        if (parseInt(selParts[0]) === calYear && parseInt(selParts[1]) - 1 === calMonth) {
+          var selSlots = dayData ? (dayData[selectedDate] || []) : [];
+          renderSlotList(selectedDate, selSlots);
+        }
+      }
+    }
+
+    function selectDate(dateStr) {
+      var key   = calYear + "/" + (calMonth + 1);
+      var slots = monthData[key] ? (monthData[key][dateStr] || []) : [];
+      if (!slots.length) return;
+
+      if (selectedSlots.length > 0 && selectedSlots[0].split(" ")[0] !== dateStr) {
+        if (!confirm("切換日期將清除已選的時段，確定要切換嗎？")) return;
+        clearSelectedSlot();
+      }
+
+      selectedDate = dateStr;
+      hideAllAlerts();
+
+      checkConflict(dateStr, function(result) {
+        if (result && result.blocked && result.blocked.length > 0) {
+          showConflictAlert(
+            ["申請失敗：您在 " + dateStr + " 已有時間重疊的排班："]
+            .concat(result.blocked.map(function(c){ return "  • " + c; }))
+            .concat(["後端送出時仍會驗證，請選擇其他時段或聯繫管理人員。"])
+          );
+        }
+        if (result && result.warning && result.warning.length > 0) {
+          showWarningAlert(result.warning);
+        }
+        renderCalendar();
+        renderSlotList(dateStr, slots);
+      });
+    }
+
+    function renderSlotList(dateStr, slots) {
+      var container = document.getElementById('slotList');
+      if (!slots || slots.length === 0) { container.style.display = 'none'; return; }
+      container.style.display = 'block';
+
+      var weekdays  = ['日','一','二','三','四','五','六'];
+      var dp        = dateStr.split("/");
+      var dObj      = new Date(parseInt(dp[0]), parseInt(dp[1])-1, parseInt(dp[2]));
+      var dateLabel = dateStr + "（" + weekdays[dObj.getDay()] + "）";
+
+      var html = '<div style="font-weight:bold; color:#333; margin-bottom:8px; font-size:0.9rem;">📅 ' + dateLabel + '</div>';
+      slots.forEach(function(s) {
+        var parts    = s.lastIndexOf(":");
+        var timeSlot = s.substring(0, parts);
+        var status   = s.substring(parts + 1);
+        var slotKey  = dateStr + " " + timeSlot;
+        var isFull   = status === "已滿";
+        var isActive = selectedSlots.indexOf(slotKey) > -1;
+        var btnClass = 'slot-btn' + (isFull ? ' full' : (isActive ? ' active' : ''));
+        var statusLabel = status === "已滿" ? "已滿" : status === "部分排班" ? "部分" : "可排班";
+
+        html += '<button type="button" class="' + btnClass + '" ' +
+          (isFull ? 'disabled' : 'onclick="selectSlot(\'' + slotKey.replace(/'/g,"\\'") + '\', this)"') + '>' +
+          '🕐 ' + timeSlot +
+          '<span class="slot-status">' + statusLabel + '</span>' +
+          '</button>';
+      });
+      container.innerHTML = html;
+    }
+
+    // ==================================================
+    // 複選邏輯
+    // ==================================================
+    function selectSlot(slotKey, btn) {
+      var idx = selectedSlots.indexOf(slotKey);
+      if (idx > -1) {
+        selectedSlots.splice(idx, 1);
+        btn.classList.remove('active');
+      } else {
+        if (selectedSlots.length > 0) {
+          var existingDate = selectedSlots[0].split(" ")[0];
+          var newDate      = slotKey.split(" ")[0];
+          if (existingDate !== newDate) {
+            showToast("僅允許選取同一天的時段，\n請先取消其他日期的選取。", false, 4000);
+            return;
+          }
+        }
+        selectedSlots.push(slotKey);
+        btn.classList.add('active');
+      }
+      updateSelectedSlotsDisplay();
+    }
+
+    function updateSelectedSlotsDisplay() {
+      var box = document.getElementById('selectedSlotsBox');
+      document.getElementById('selectedCount').textContent = selectedSlots.length;
+      if (selectedSlots.length === 0) {
+        box.style.display = 'none';
+        document.getElementById('selectedSlot').value = '';
+        return;
+      }
+      box.style.display = 'block';
+      document.getElementById('selectedSlot').value = selectedSlots[0];
+      var html = '';
+      selectedSlots.forEach(function(slot) {
+        var parts = slot.split(" ");
+        var label = parts.length >= 2 ? parts[1] : slot;
+        html += '<span class="slot-tag">' + label +
+          ' <span class="remove-tag" onclick="removeSlotTag(\'' + slot.replace(/'/g,"\\'") + '\')">✕</span>' +
+          '</span>';
+      });
+      document.getElementById('selectedTagsContainer').innerHTML = html;
+    }
+
+    function removeSlotTag(slotKey) {
+      var idx = selectedSlots.indexOf(slotKey);
+      if (idx > -1) selectedSlots.splice(idx, 1);
+      document.querySelectorAll('.slot-btn').forEach(function(btn) {
+        var onclickStr = btn.getAttribute('onclick') || '';
+        var match = onclickStr.match(/selectSlot\('([^']+)'/);
+        if (match && match[1] === slotKey) btn.classList.remove('active');
+      });
+      updateSelectedSlotsDisplay();
+    }
+
+    function clearSelectedSlot() {
+      selectedSlots = [];
+      selectedDate  = null;
+      document.getElementById('selectedSlot').value = '';
+      document.getElementById('selectedSlotsBox').style.display = 'none';
+      document.getElementById('selectedTagsContainer').innerHTML = '';
+      document.getElementById('selectedCount').textContent = '0';
+      document.querySelectorAll('.slot-btn').forEach(function(b) { b.classList.remove('active'); });
+      var slotList = document.getElementById('slotList');
+      if (slotList) slotList.style.display = 'none';
+    }
+
+    // ==================================================
+    // 月曆：上下月切換
+    // ==================================================
+    function calPrevMonth() {
+      calMonth--;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      window._userNavigated = true;
+      loadMonthData(calYear, calMonth);
+    }
+
+    function calNextMonth() {
+      calMonth++;
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      window._userNavigated = true;
+      loadMonthData(calYear, calMonth);
+    }
+
+    // ==================================================
+    // 表單送出
+    // ==================================================
+    document.getElementById('volunteerForm').onsubmit = function(e) {
+      e.preventDefault();
+      var name = document.getElementById('volunteerName').value;
+      var id   = document.getElementById('volunteerId').value.trim();
+      var op   = "申請排班";
+
+      if (!name) { showToast("請輸入志工編號並確認姓名。", false, 5000); return; }
+      if (selectedSlots.length === 0) { showToast("請選擇排班時段。", false, 5000); return; }
+
+      var btn     = document.getElementById('submitBtn');
+      var loadDiv = document.getElementById('loading');
+      var notes   = document.getElementById('notes').value;
+
+      btn.disabled = true;
+      loadDiv.style.display = 'block';
+
+      if (selectedSlots.length === 1) {
+        google.script.run
+          .withSuccessHandler(function(msg) {
+            btn.disabled = false; loadDiv.style.display = 'none';
+            var isSuccess = msg.includes("成功");
+            showToast(msg, isSuccess, isSuccess ? 10000 : 5000);
+            if (isSuccess) resetForm();
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false; loadDiv.style.display = 'none';
+            showToast("發生錯誤：" + err, false, 5000);
+          })
+          .processVolunteerRequest(name, id, activityName, selectedSlots[0], op, notes);
+      } else {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.disabled = false; loadDiv.style.display = 'none';
+            var allSuccess = res.results.every(function(r) { return r.result.includes("成功"); });
+
+            if (allSuccess) {
+              // 全部成功 → 直接 reset
+              showToast(res.summary, true, 10000);
+              resetForm();
+            } else {
+              // 部分成功 → 移除已成功的時段，保留失敗的
+              var successSlots = [];
+              var failMsgs     = [];
+              res.results.forEach(function(r) {
+                if (r.result.includes("成功")) {
+                  successSlots.push(r.slot);
+                } else {
+                  var parts = r.slot.split(" ");
+                  var label = parts.length >= 2 ? parts[1] : r.slot;
+                  failMsgs.push(label + "：" + r.result);
+                }
+              });
+
+              // 從 selectedSlots 移除已成功的
+              successSlots.forEach(function(slot) {
+                var idx = selectedSlots.indexOf(slot);
+                if (idx > -1) selectedSlots.splice(idx, 1);
+              });
+
+              // 更新 UI 顯示
+              updateSelectedSlotsDisplay();
+
+              // 重新整理月曆（讓已成功的時段顯示正確狀態）
+              var key = calYear + "/" + (calMonth + 1);
+              delete monthData[key];
+              loadMonthData(calYear, calMonth);
+
+              // 顯示結果訊息
+              var msg = "成功 " + successSlots.length + " 個，失敗 " + failMsgs.length + " 個：\n" + failMsgs.join("\n");
+              showToast(msg, false, 10000);
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false; loadDiv.style.display = 'none';
+            showToast("發生錯誤：" + err, false, 5000);
+          })
+          .processVolunteerRequestBatch(name, id, activityName, selectedSlots, op, notes);
+      }
+    };
+
+    // ==================================================
+    // 重設表單
+    // ==================================================
+    function resetForm() {
+      document.getElementById('volunteerForm').reset();
+      document.getElementById('activityDisplay').textContent = activityName;
+      document.getElementById('nameDisplay').style.display   = 'none';
+      document.getElementById('volunteerName').value         = '';
+      document.getElementById('pendingAnnouncesBox').style.display = 'none';
+      document.getElementById('pendingAnnouncesContent').innerHTML = '';
+      clearSelectedSlot();
+      hideAllAlerts();
+      conflictCache = {};
+      monthData     = {};
+      openMonthsFromServer = [];
+      availableMonths = [];
+      window._pendingSessionShown = false;
+      window._userNavigated = false;
+      renderCalendar();
+    }
+
+    function goBack() {
+      window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>';
+    }
+
+    function showToast(msg, isSuccess, duration) {
+      var toast = document.getElementById('toast-msg');
+      toast.textContent   = msg;
+      toast.className     = isSuccess ? 'success' : 'error';
+      toast.style.display = 'block';
+      toast.style.opacity = '1';
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        setTimeout(function() { toast.style.display = 'none'; }, 500);
+      }, duration || 5000);
+    }
+  </script>
+</body>
+</html>
