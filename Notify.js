@@ -1,8 +1,13 @@
 // ================================================
 // Email 通知函數
 // ================================================
-var LINE_CHANNEL_TOKEN = "dcOZRpFERKpiUToUV9aPWXm2D4IrkP79SODE+zTHAkWj/2YNBu5lvjxvjOK1CP4uh1w4eIDPIF0Ndj7wSRHaeo9hbkqQxzZHfrd9QLn7UVDbLrW/LyXsk2bRXA3zAzeeU7HhPCbYXwWsZyOVdDNTbgdB04t89/1O/w1cDnyilFU=";
-var LINE_GROUP_ID = "Ce5ea198f13af4536168b2a2af665879a";
+function getLineToken() {
+  return PropertiesService.getScriptProperties().getProperty("LINE_TOKEN") || "";
+}
+
+function getLineGroupId() {
+  return PropertiesService.getScriptProperties().getProperty("LINE_GROUP_ID") || "";
+}
 /**
  * 每日定時執行：掃描未來一個月未排滿時段，通知管理者
  * sendLine: true = 同時推 LINE，false = 只發 Email
@@ -271,12 +276,18 @@ function buildLineMessage(allGrouped) {
 
 function sendLineMessage(message) {
   try {
+    var token   = getLineToken();
+    var groupId = getLineGroupId();
+    if (!token || !groupId) {
+      Logger.log("LINE 設定未完成，略過推播。");
+      return;
+    }
     var options = {
       method: "post",
       contentType: "application/json",
-      headers: { "Authorization": "Bearer " + LINE_CHANNEL_TOKEN },
+      headers: { "Authorization": "Bearer " + token },
       payload: JSON.stringify({
-        to: LINE_GROUP_ID,
+        to: groupId,
         messages: [{ type: "text", text: message }]
       }),
       muteHttpExceptions: true
