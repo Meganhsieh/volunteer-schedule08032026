@@ -1,5 +1,9 @@
 // ================================================
 // 排班處理函數
+// 版本：v1.4
+// v1.1：讀表快取（getSheetData）
+// v1.2：優先期時數改為後台可設定；新增取消相關參數
+// v1.4：移除公告到期日（改由「排班規則」表管理）
 // ================================================
 
 function padTime(t) {
@@ -66,11 +70,43 @@ function parseSessionOpenTime(raw) {
 }
 
 // ================================================
+// ★ v1.2 新增：後台可調參數
+// 全部存在「系統設定」工作表，管理者後台可修改
+// ================================================
+
+/**
+ * 優先排班期時數（公告開放後多久內套用優先配額）
+ * 僅適用二觀型。未設定時預設 48 小時
+ */
+function getPriorityHours() {
+  var v = parseInt(getSystemConfig("優先期時數"));
+  return (isNaN(v) || v < 0) ? 48 : v;
+}
+
+/**
+ * 取消截止天數（值勤日前幾天內不可自助取消）
+ * 未設定時預設 7 天。供自助取消功能使用
+ */
+function getCancelDeadlineDays() {
+  var v = parseInt(getSystemConfig("取消截止天數"));
+  return (isNaN(v) || v < 0) ? 7 : v;
+}
+
+/**
+ * 每人每月自助取消額度（跨所有活動累計）
+ * 未設定時預設 2 次。供自助取消功能使用
+ */
+function getSelfCancelQuota() {
+  var v = parseInt(getSystemConfig("自助取消月額度"));
+  return (isNaN(v) || v < 0) ? 2 : v;
+}
+
+// ================================================
 // ★ 依申請月份找對應公告時間
 // 若同一月份有多筆公告，取最新（最晚）的那筆
 // ================================================
 function getAnnounceTimeForMonth(activityName, yearMonth) {
-  var data = getSheet(SHEET.ANNOUNCE).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.ANNOUNCE);
   var result = null;
   for (var i = 1; i < data.length; i++) {
     if (data[i][1] !== activityName) continue;
@@ -89,7 +125,7 @@ function getAnnounceTimeForMonth(activityName, yearMonth) {
 // ================================================
 
 function buildAnnounceCache(activityName) {
-  var data  = getSheet(SHEET.ANNOUNCE).getDataRange().getDisplayValues();
+  var data  = getSheetData(SHEET.ANNOUNCE);
   var now   = new Date();
   var cache = { open: [], pending: [], latestAnnounce: null };
 
@@ -100,6 +136,7 @@ function buildAnnounceCache(activityName) {
     if (!openTime) continue;
     var m1 = (data[i][2] || "").toString().trim();
     var m2 = (data[i][3] || "").toString().trim();
+
     if (now >= openTime) {
       if (m1) cache.open.push(m1);
       if (m2) cache.open.push(m2);
@@ -141,7 +178,7 @@ function getPendingAnnouncesFromCache(cache) {
 }
 
 function getOpenMonths(activityName) {
-  var data = getSheet(SHEET.ANNOUNCE).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.ANNOUNCE);
   var now  = new Date();
   var openMonths = {};
   for (var i = 1; i < data.length; i++) {
@@ -149,6 +186,7 @@ function getOpenMonths(activityName) {
     var raw = data[i][0].toString().trim();
     var openTime = parseOpenDateTime(raw);
     if (!openTime || now < openTime) continue;
+    // 注意：到期日不影響開放月份，避免缺額出現卻無法排班
     var m1 = (data[i][2] || "").toString().trim();
     var m2 = (data[i][3] || "").toString().trim();
     if (m1) openMonths[m1] = true;
@@ -158,7 +196,7 @@ function getOpenMonths(activityName) {
 }
 
 function getNextOpenTime(activityName) {
-  var data = getSheet(SHEET.ANNOUNCE).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.ANNOUNCE);
   var now  = new Date(), next = null;
   for (var i = 1; i < data.length; i++) {
     if (!data[i][0] || data[i][1] !== activityName) continue;
@@ -182,7 +220,7 @@ function checkMonthOpen(activityName, dateStr) {
 }
 
 function getLatestAnnounceDate(activityName) {
-  var data = getSheet(SHEET.ANNOUNCE).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.ANNOUNCE);
   var latest = null;
   for (var i = 1; i < data.length; i++) {
     if (data[i][1] !== activityName || !data[i][0]) continue;
@@ -198,7 +236,7 @@ function getLatestAnnounceDate(activityName) {
 
 function getMonthQuota(activityName, yearMonth) {
   try {
-    var data = getSheet(SHEET.MONTH_QUOTA).getDataRange().getDisplayValues();
+    var data = getSheetData(SHEET.MONTH_QUOTA);
     for (var i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() !== activityName) continue;
       if (data[i][1].toString().trim() !== yearMonth) continue;
@@ -287,11 +325,12 @@ function saveMonthQuotas(activityName, months) {
     }
     if (!found) { sheet.appendRow(row); data.push(row); }
   });
+  invalidateSheetData(SHEET.MONTH_QUOTA);
 }
 
 function getAdminMonthQuotas() {
   try {
-    var data = getSheet(SHEET.MONTH_QUOTA).getDataRange().getDisplayValues();
+    var data = getSheetData(SHEET.MONTH_QUOTA);
     var list = [];
     function pq(v) { var s = v ? v.toString().trim() : ''; return s === '' ? '' : parseInt(s); }
     for (var i = 1; i < data.length; i++) {
@@ -327,6 +366,7 @@ function updateMonthQuota(rowIndex, activity, yearMonth, weekdayMax, holidayMax,
     toVal(prior_gp), toVal(prior_gf), toVal(prior_np), toVal(prior_nf),
     toVal(normal_gp), toVal(normal_gf), toVal(normal_np), toVal(normal_nf)
   ]]);
+  invalidateSheetData(SHEET.MONTH_QUOTA);
   return "月份人數設定已更新！";
 }
 
@@ -334,6 +374,7 @@ function deleteMonthQuota(rowIndex) {
   var sheet = getSheet(SHEET.MONTH_QUOTA);
   if (rowIndex < 2 || rowIndex > sheet.getLastRow()) return "找不到對應設定。";
   sheet.deleteRow(rowIndex);
+  invalidateSheetData(SHEET.MONTH_QUOTA);
   return "已刪除月份人數設定。";
 }
 
@@ -343,7 +384,7 @@ function deleteMonthQuota(rowIndex) {
 
 function getSpecialDateConfigs() {
   try {
-    var data = getSheet(SHEET.SPECIAL_DATE).getDataRange().getDisplayValues();
+    var data = getSheetData(SHEET.SPECIAL_DATE);
     var configs = [];
     for (var i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;
@@ -388,7 +429,7 @@ function isDateDisabled(dateStr, activityName) {
 
 function getSummerConfigs() {
   try {
-    var data = getSheet(SHEET.SUMMER).getDataRange().getDisplayValues();
+    var data = getSheetData(SHEET.SUMMER);
     var configs = [];
     for (var i = 1; i < data.length; i++) {
       if (!data[i][0] || !data[i][1]) continue;
@@ -446,7 +487,7 @@ function isTimeOverlap(slotA, slotB) {
 
 function checkCrossActivityConflict(volunteerId, currentActivityName, dateStr, currentTimeSlot) {
   var blocked = [], warning = [];
-  var overviewData = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+  var overviewData = getSheetData(SHEET.OVERVIEW);
   for (var i = 1; i < overviewData.length; i++) {
     var rowActivity = overviewData[i][0];
     if (rowActivity === currentActivityName) continue;
@@ -462,7 +503,7 @@ function checkCrossActivityConflict(volunteerId, currentActivityName, dateStr, c
       blocked.push(label);
     } else { warning.push(label); }
   }
-  var rosterData = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+  var rosterData = getSheetData(SHEET.SESSION_ROSTER);
   for (var j = 1; j < rosterData.length; j++) {
     if (rosterData[j][2] != volunteerId) continue;
     if (rosterData[j][0] !== dateStr) continue;
@@ -478,12 +519,12 @@ function checkCrossActivityConflict(volunteerId, currentActivityName, dateStr, c
 }
 
 function getSessionActivityName(dateStr, timeSlot) {
-  var data = getSheet(SHEET.SESSION).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.SESSION);
   var normalizedStart = padTime(timeSlot.split("-")[0]);
   for (var i = 1; i < data.length; i++) {
     if (data[i][1] === dateStr && padTime(data[i][2]) === normalizedStart) return data[i][0];
   }
-  var overviewData = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+  var overviewData = getSheetData(SHEET.OVERVIEW);
   for (var j = 1; j < overviewData.length; j++) {
     if (overviewData[j][1] === dateStr && overviewData[j][2] === timeSlot) return overviewData[j][0];
   }
@@ -538,7 +579,7 @@ function checkCrossActivityConflictCached(volunteerId, currentActivityName, date
       blocked.push(label);
     } else { warning.push(label); }
   }
-  var rosterData = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+  var rosterData = getSheetData(SHEET.SESSION_ROSTER);
   for (var j = 1; j < rosterData.length; j++) {
     if (rosterData[j][2] != volunteerId) continue;
     if (rosterData[j][0] !== dateStr) continue;
@@ -554,7 +595,7 @@ function checkCrossActivityConflictCached(volunteerId, currentActivityName, date
 }
 
 function getSessionActivityNameCached(dateStr, timeSlot, overviewData) {
-  var data = getSheet(SHEET.SESSION).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.SESSION);
   var normalizedStart = padTime(timeSlot.split("-")[0]);
   for (var i = 1; i < data.length; i++) {
     if (data[i][1] === dateStr && padTime(data[i][2].toString()) === normalizedStart) return data[i][0];
@@ -572,7 +613,7 @@ function getSessionActivityNameCached(dateStr, timeSlot, overviewData) {
 function processBinocularRequest(volunteer, activity, scheduleSlot, notes) {
   var slotParts0 = scheduleSlot.split(" ");
   var overviewSheet  = getSheet(SHEET.OVERVIEW);
-  var overviewData   = overviewSheet.getDataRange().getDisplayValues();
+  var overviewData   = getSheetData(SHEET.OVERVIEW);
   var specialCache   = buildSpecialDateCache(activity.name);
   var monthQCache    = buildMonthQuotaCache();
   var announceCache  = buildAnnounceCache(activity.name);
@@ -609,6 +650,7 @@ function processBinocularRequest(volunteer, activity, scheduleSlot, notes) {
         conflictResult.blocked.map(function(c) { return "  • " + c; }).join("\n") + "\n請聯繫管理人員處理。";
     }
     updateOverviewSheetCached(overviewSheet, overviewData, activity.name, scheduleSlot, volunteer.name, volunteer.id, "add", specialCache, monthQCache);
+    invalidateSheetData(SHEET.OVERVIEW);   // ★ 批次申請時確保下一筆讀到最新資料
     createCalendarEvent(activity.calendarId, scheduleSlot, volunteer.name);
     logFormResponse(volunteer.name, volunteer.id, activity.name, scheduleSlot, "申請排班", notes, "成功");
     if (conflictResult.warning.length > 0) {
@@ -619,7 +661,7 @@ function processBinocularRequest(volunteer, activity, scheduleSlot, notes) {
   return "申請失敗：找不到對應時段。";
 }
 
-// ★ 核心修正：依申請月份的公告時間判斷72小時優先期
+// ★ v1.2：優先期時數改讀後台設定
 function checkBinocularQuotaCached(volunteer, scheduleSlot, overviewData, monthQCache) {
   var slotParts = scheduleSlot.split(" ");
   var dateStr   = slotParts[0];
@@ -645,10 +687,11 @@ function checkBinocularQuotaCached(volunteer, scheduleSlot, overviewData, monthQ
   var defaults = getDefaultQuotas();
   var key      = getQuotaKey(volunteer);
 
-  // ★ 依申請月份找對應公告時間，判斷72小時優先期
+  // ★ v1.2：優先期時數由後台設定（預設 48 小時）
+  var priorHours   = getPriorityHours();
   var announceDate = getAnnounceTimeForMonth(actName, yearMonth);
   var now = new Date();
-  var isPrior = announceDate && ((now - announceDate) <= 72 * 60 * 60 * 1000);
+  var isPrior = announceDate && ((now - announceDate) <= priorHours * 60 * 60 * 1000);
 
   var quota;
   if (isPrior) {
@@ -674,7 +717,7 @@ function checkBinocularQuotaCached(volunteer, scheduleSlot, overviewData, monthQ
 
   if (bookedCount >= quota) {
     if (isPrior) {
-      return "申請失敗：優先排班期間，您本月已達排班上限（" + quota + "個時段）。如需加排請稍候72小時後即可再加排班。謝謝。";
+      return "申請失敗：優先排班期間，您本月已達排班上限（" + quota + "個時段）。如需加排，請於公告開放 " + priorHours + " 小時後再申請。謝謝。";
     } else {
       return "申請失敗：您本月已達排班上限（" + quota + "個時段）。";
     }
@@ -705,7 +748,7 @@ function processSessionRequest(volunteer, activity, scheduleSlot, notes) {
     var ts = y+"/"+mo+"/"+d+" "+(h<10?"0"+h:h)+":"+(mi<10?"0"+mi:mi);
     return "申請失敗：此場次尚未開放登記，開放時間為 " + ts + "，請屆時再申請。";
   }
-  var rosterData = sessionRosterSheet.getDataRange().getDisplayValues();
+  var rosterData = getSheetData(SHEET.SESSION_ROSTER);
   for (var i = 1; i < rosterData.length; i++) {
     if (rosterData[i][0] === dateStr && rosterData[i][1] === timeSlot && rosterData[i][2] === volunteer.id)
       return "申請失敗：您已報名此場次。";
@@ -723,6 +766,7 @@ function processSessionRequest(volunteer, activity, scheduleSlot, notes) {
       conflictResult.blocked.map(function(c) { return "  • " + c; }).join("\n") + "\n請聯繫管理人員處理。";
   }
   sessionRosterSheet.appendRow([dateStr, timeSlot, volunteer.id, volunteer.name, volunteer.type, new Date()]);
+  invalidateSheetData(SHEET.SESSION_ROSTER);   // ★ 批次申請時確保下一筆讀到最新資料
   updateSessionOverviewStatus(activity.name, dateStr, timeSlot, sessionConfig);
   createCalendarEvent(activity.calendarId, scheduleSlot, volunteer.name);
   logFormResponse(volunteer.name, volunteer.id, activity.name, scheduleSlot, "申請排班", notes, "成功");
@@ -737,7 +781,7 @@ function processSessionRequest(volunteer, activity, scheduleSlot, notes) {
 // ================================================
 
 function getSessionConfig(activityName, date, timeSlot) {
-  var data = getSheet(SHEET.SESSION).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.SESSION);
   var normalizedStart = padTime(timeSlot.split("-")[0]);
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] === activityName && data[i][1] === date && padTime(data[i][2]) === normalizedStart)
@@ -747,7 +791,7 @@ function getSessionConfig(activityName, date, timeSlot) {
 }
 
 function countSessionBookings(dateStr, timeSlot, activityName, volunteerType) {
-  var data = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.SESSION_ROSTER);
   var count = 0;
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] === dateStr && data[i][1] === timeSlot && data[i][4] === volunteerType) count++;
@@ -757,7 +801,7 @@ function countSessionBookings(dateStr, timeSlot, activityName, volunteerType) {
 
 function updateSessionOverviewStatus(activityName, dateStr, timeSlot, sessionConfig) {
   var overviewSheet = getSheet(SHEET.OVERVIEW);
-  var data = overviewSheet.getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.OVERVIEW);
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] === activityName && data[i][1] === dateStr && data[i][2] === timeSlot) {
       var gc    = countSessionBookings(dateStr, timeSlot, activityName, VOLUNTEER_TYPE.GENERAL);
@@ -765,6 +809,7 @@ function updateSessionOverviewStatus(activityName, dateStr, timeSlot, sessionCon
       var total = gc + nc;
       var maxT  = sessionConfig.generalMax + sessionConfig.newMax;
       overviewSheet.getRange(i + 1, 8).setValue(total >= maxT ? "已滿" : total > 0 ? "部分排班" : "可排班");
+      invalidateSheetData(SHEET.OVERVIEW);
       break;
     }
   }
@@ -828,7 +873,7 @@ function buildSpecialDateCache(activityName) {
 function buildMonthQuotaCache() {
   var cache = {};
   try {
-    var data = getSheet(SHEET.MONTH_QUOTA).getDataRange().getDisplayValues();
+    var data = getSheetData(SHEET.MONTH_QUOTA);
     function pq(v) { var s = v !== undefined && v !== null ? v.toString().trim() : ''; return s === '' ? null : parseInt(s); }
     for (var i = 1; i < data.length; i++) {
       if (!data[i][0] && !data[i][1]) continue;
@@ -860,7 +905,7 @@ function getBinocularSlotDefs(dateStr, activityName) {
   return day === 6 ? BINOCULAR_SLOTS.SATURDAY : day === 0 ? BINOCULAR_SLOTS.SUNDAY : BINOCULAR_SLOTS.WEEKDAY;
 }
 
-// ★ 核心修正：依申請月份的公告時間判斷72小時優先期
+// ★ v1.2：優先期時數改讀後台設定
 function checkBinocularQuota(volunteer, scheduleSlot) {
   var slotParts = scheduleSlot.split(" ");
   var dateStr   = slotParts[0];
@@ -871,10 +916,11 @@ function checkBinocularQuota(volunteer, scheduleSlot) {
   var defaults  = getDefaultQuotas();
   var key       = getQuotaKey(volunteer);
 
-  // ★ 依申請月份找對應公告時間，判斷72小時優先期
+  // ★ v1.2：優先期時數由後台設定（預設 48 小時）
+  var priorHours   = getPriorityHours();
   var announceDate = getAnnounceTimeForMonth(actName, yearMonth);
   var now = new Date();
-  var isPrior = announceDate && ((now - announceDate) <= 72 * 60 * 60 * 1000);
+  var isPrior = announceDate && ((now - announceDate) <= priorHours * 60 * 60 * 1000);
 
   var quota;
   if (isPrior) {
@@ -888,7 +934,7 @@ function checkBinocularQuota(volunteer, scheduleSlot) {
   var bookedCount = countMonthlyBookings(volunteer.id, actName, slotDate.getFullYear(), slotDate.getMonth());
   if (bookedCount >= quota) {
     if (isPrior) {
-      return "申請失敗：優先排班期間，您本月已達排班上限（" + quota + "個時段）。如需加排請稍候72小時後即可再加排班。謝謝。";
+      return "申請失敗：優先排班期間，您本月已達排班上限（" + quota + "個時段）。如需加排，請於公告開放 " + priorHours + " 小時後再申請。謝謝。";
     } else {
       return "申請失敗：您本月已達排班上限（" + quota + "個時段）。";
     }
@@ -905,7 +951,7 @@ function checkRegistrationOpen(activityName, scheduleSlot) {
   var dateStr  = parts[0];
   var timeSlot = parts[1];
   var startT   = padTime(timeSlot.split("-")[0]);
-  var data = getSheet(SHEET.SESSION).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.SESSION);
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] !== activityName || data[i][1] !== dateStr) continue;
     if (padTime(data[i][2].toString()) !== startT) continue;
@@ -930,7 +976,7 @@ function countWorkDays(startDate, endDate) {
 }
 
 function countMonthlyBookings(volunteerId, activityName, year, month) {
-  var data = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.OVERVIEW);
   var count = 0;
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] !== activityName) continue;
@@ -981,6 +1027,7 @@ function updateOverviewSheet(sheet, activityName, slot, name, id, action) {
       }
     }
     updateSlotStatus(sheet, row, data[i][1], data[i][2]);
+    invalidateSheetData(SHEET.OVERVIEW);
     break;
   }
 }
@@ -1007,7 +1054,7 @@ function updateSlotStatus(sheet, row, dateStr, timeSlot) {
 
 function getAvailableScheduleSlots(activityName) {
   var now  = new Date();
-  var data = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.OVERVIEW);
   var slots = [];
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] !== activityName || data[i][11] === "已滿" || !data[i][1] || !data[i][2]) continue;
@@ -1020,13 +1067,13 @@ function getAvailableScheduleSlots(activityName) {
 
 function getAvailableSessionSlots(activityName) {
   var now        = new Date();
-  var rosterData = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+  var rosterData = getSheetData(SHEET.SESSION_ROSTER);
   var countMap   = {};
   for (var r = 1; r < rosterData.length; r++) {
     var k = rosterData[r][0] + "|" + rosterData[r][1];
     countMap[k] = (countMap[k] || 0) + 1;
   }
-  var sessionData = getSheet(SHEET.SESSION).getDataRange().getDisplayValues();
+  var sessionData = getSheetData(SHEET.SESSION);
   var slots = [];
   for (var i = 1; i < sessionData.length; i++) {
     if (sessionData[i][0] !== activityName) continue;
@@ -1113,6 +1160,7 @@ function generateBinocularSlots(announceDate, activityName, targetMonths) {
     overviewSheet.getRange(overviewSheet.getLastRow() + 1, 1, newOverviewRows.length, 13).setValues(newOverviewRows);
   if (newCacheRows.length > 0)
     cacheSheet.getRange(cacheSheet.getLastRow() + 1, 1, newCacheRows.length, 4).setValues(newCacheRows);
+  invalidateSheetData(SHEET.OVERVIEW);
   return slotsAdded;
 }
 
@@ -1122,7 +1170,7 @@ function getPersonalSchedule(name, volunteerId, startMonth, endMonth) {
   var today = new Date();
   today.setHours(0, 0, 0, 0);
   var activeRecords = [], totalMinutes = 0;
-  var overviewData = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+  var overviewData = getSheetData(SHEET.OVERVIEW);
   for (var i = 1; i < overviewData.length; i++) {
     var isMySlot = false;
     for (var v = 0; v < VOL_COLS.length; v++) {
@@ -1139,10 +1187,10 @@ function getPersonalSchedule(name, volunteerId, startMonth, endMonth) {
         mins   = (parseInt(e2[0])*60+parseInt(e2[1])) - (parseInt(s[0])*60+parseInt(s[1]));
         totalMinutes += mins;
       }
-      activeRecords.push({ activity: overviewData[i][0], date: overviewData[i][1], slot: slot, hours: (mins/60).toFixed(1) });
+      activeRecords.push({ activity: overviewData[i][0], activityType: ACTIVITY_TYPE.BINOCULAR, date: overviewData[i][1], slot: slot, hours: (mins/60).toFixed(1) });
     }
   }
-  var rosterData = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+  var rosterData = getSheetData(SHEET.SESSION_ROSTER);
   for (var j = 1; j < rosterData.length; j++) {
     if (rosterData[j][2] == volunteerId) {
       var d2 = new Date(dateToISO(rosterData[j][0]));
@@ -1156,7 +1204,7 @@ function getPersonalSchedule(name, volunteerId, startMonth, endMonth) {
           totalMinutes += mins2;
         }
         var sessionActName = getSessionActivityName(rosterData[j][0], rosterData[j][1]) || "（場次型活動）";
-activeRecords.push({ activity: sessionActName, date: rosterData[j][0], slot: slot2, hours: (mins2/60).toFixed(1) });
+        activeRecords.push({ activity: sessionActName, activityType: ACTIVITY_TYPE.SESSION, date: rosterData[j][0], slot: slot2, hours: (mins2/60).toFixed(1) });
       }
     }
   }
@@ -1187,14 +1235,35 @@ activeRecords.push({ activity: sessionActName, date: rosterData[j][0], slot: slo
     }
   } catch(e) { Logger.log("讀取表單回應失敗：" + e.toString()); }
   logRecords.sort(function(a, b) { return b.rowIndex - a.rowIndex; });
-  return { name: volunteer.name, activeRecords: activeRecords, totalHours: (totalMinutes / 60).toFixed(1), logRecords: logRecords };
+  // ★ v1.5：加上自助取消資訊
+  var cancelInfo   = getSelfCancelInfo(volunteerId);
+  var deadlineDays = cancelInfo.deadlineDays;
+  activeRecords.forEach(function(r) {
+    var d = daysUntilSlot(r.date);
+    r.daysUntil = d;
+    if (d !== null && d <= deadlineDays) {
+      r.cancelable  = false;
+      r.blockReason = 'deadline';
+    } else {
+      r.cancelable  = true;
+      r.blockReason = null;
+    }
+  });
+
+  return {
+    name: volunteer.name,
+    activeRecords: activeRecords,
+    totalHours: (totalMinutes / 60).toFixed(1),
+    logRecords: logRecords,
+    cancelInfo: cancelInfo
+  };
 }
 
 function getVolunteerHours(name, volunteerId, startMonth, endMonth) {
   var volunteer = validateVolunteer(name, volunteerId);
   if (!volunteer) return null;
   var start = startMonth.substring(0, 7), end = endMonth.substring(0, 7);
-  var sheet = getSheet("時數資料"), data = sheet.getDataRange().getDisplayValues();
+  var data = getSheetData("時數資料");
   var latestMonth = "";
   for (var i = data.length - 1; i >= 1; i--) {
     var raw = data[i][0].toString().trim();
@@ -1236,7 +1305,7 @@ function adminGetVolunteerSchedule(volunteerId) {
   var today = new Date();
   today.setHours(0, 0, 0, 0);
   var records = [];
-  var overviewData = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+  var overviewData = getSheetData(SHEET.OVERVIEW);
   for (var i = 1; i < overviewData.length; i++) {
     var row = overviewData[i], matchedVol = null;
     for (var v = 0; v < VOL_COLS.length; v++) {
@@ -1247,7 +1316,7 @@ function adminGetVolunteerSchedule(volunteerId) {
     if (d < today) continue;
     records.push({ activity: row[0], activityType: ACTIVITY_TYPE.BINOCULAR, date: row[1], slot: row[2], volunteerId: row[VOL_COLS[matchedVol].id], volunteerName: row[VOL_COLS[matchedVol].name] });
   }
-  var rosterData = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+  var rosterData = getSheetData(SHEET.SESSION_ROSTER);
   for (var j = 1; j < rosterData.length; j++) {
     var r = rosterData[j];
     if (r[2] != volunteerId) continue;
@@ -1268,7 +1337,7 @@ function adminGetSlotRoster(activityName, dateStr) {
   var records  = [], activity = getActivityConfig(activityName);
   if (!activity) return records;
   if (activity.type === ACTIVITY_TYPE.BINOCULAR) {
-    var overviewData = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+    var overviewData = getSheetData(SHEET.OVERVIEW);
     for (var i = 1; i < overviewData.length; i++) {
       var row = overviewData[i];
       if (row[0] !== activityName || row[1] !== dateStr) continue;
@@ -1279,7 +1348,7 @@ function adminGetSlotRoster(activityName, dateStr) {
       }
     }
   } else {
-    var rosterData = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+    var rosterData = getSheetData(SHEET.SESSION_ROSTER);
     for (var j = 1; j < rosterData.length; j++) {
       var r = rosterData[j];
       if (r[0] !== dateStr) continue;
@@ -1296,6 +1365,7 @@ function adminCancelSchedule(activityName, scheduleSlot, volunteerId, adminEmail
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(30000);
+    invalidateSheetData();   // ★ 批次取消時確保每筆都讀到最新資料
     var activity = getActivityConfig(activityName);
     if (!activity) return "取消失敗：找不到活動設定。";
     var volunteerName = getVolunteerNameById(volunteerId);
@@ -1306,7 +1376,7 @@ function adminCancelSchedule(activityName, scheduleSlot, volunteerId, adminEmail
     var dateStr   = slotParts[0], timeSlot = slotParts[1];
     if (activity.type === ACTIVITY_TYPE.BINOCULAR) {
       var overviewSheet = getSheet(SHEET.OVERVIEW);
-      var data = overviewSheet.getDataRange().getDisplayValues();
+      var data = getSheetData(SHEET.OVERVIEW);
       var found = false;
       for (var i = 1; i < data.length; i++) {
         if (data[i][0] !== activityName || data[i][1] !== dateStr || data[i][2] !== timeSlot) continue;
@@ -1322,11 +1392,13 @@ function adminCancelSchedule(activityName, scheduleSlot, volunteerId, adminEmail
       if (!found) return "取消失敗：找不到對應排班紀錄。";
     } else {
       var rosterSheet = getSheet(SHEET.SESSION_ROSTER);
-      var rosterData  = rosterSheet.getDataRange().getDisplayValues();
+      var rosterData  = getSheetData(SHEET.SESSION_ROSTER);
       var deleted = false;
       for (var j = rosterData.length - 1; j >= 1; j--) {
         if (rosterData[j][0] === dateStr && rosterData[j][1] === timeSlot && rosterData[j][2] == volunteerId) {
-          rosterSheet.deleteRow(j + 1); deleted = true; break;
+          rosterSheet.deleteRow(j + 1);
+          invalidateSheetData(SHEET.SESSION_ROSTER);
+          deleted = true; break;
         }
       }
       if (!deleted) return "取消失敗：找不到對應排班紀錄。";
@@ -1347,6 +1419,7 @@ function adminReplaceSchedule(activityName, scheduleSlot, oldVolunteerId, newVol
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(30000);
+    invalidateSheetData();   // ★ 確保讀到最新資料
     var activity = getActivityConfig(activityName);
     if (!activity) return "換人失敗：找不到活動設定。";
     var oldName = getVolunteerNameById(oldVolunteerId);
@@ -1363,7 +1436,7 @@ function adminReplaceSchedule(activityName, scheduleSlot, oldVolunteerId, newVol
       return "換人失敗：代班志工在 " + dateStr + " 已有時間重疊的排班：\n" + conflictResult.blocked.map(function(c) { return "  • " + c; }).join("\n");
     }
     if (activity.type === ACTIVITY_TYPE.BINOCULAR) {
-      var ov = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
+      var ov = getSheetData(SHEET.OVERVIEW);
       for (var ci = 1; ci < ov.length; ci++) {
         if (ov[ci][0] === activityName && ov[ci][1] === dateStr && ov[ci][2] === timeSlot) {
           for (var vc = 0; vc < VOL_COLS.length; vc++) {
@@ -1378,7 +1451,7 @@ function adminReplaceSchedule(activityName, scheduleSlot, oldVolunteerId, newVol
       var quotaCheck = checkBinocularQuota(newVolunteer, scheduleSlot);
       if (quotaCheck !== true) return "換人失敗（代班志工配額）：" + quotaCheck;
       var overviewSheet = getSheet(SHEET.OVERVIEW);
-      var data = overviewSheet.getDataRange().getDisplayValues();
+      var data = getSheetData(SHEET.OVERVIEW);
       var found = false;
       for (var i = 1; i < data.length; i++) {
         if (data[i][0] !== activityName || data[i][1] !== dateStr || data[i][2] !== timeSlot) continue;
@@ -1388,17 +1461,18 @@ function adminReplaceSchedule(activityName, scheduleSlot, oldVolunteerId, newVol
         var row = i + 1;
         overviewSheet.getRange(row, VOL_COLS[targetVol].name + 1).setValue(newVolunteer.name);
         overviewSheet.getRange(row, VOL_COLS[targetVol].id   + 1).setValue(newVolunteer.id);
+        invalidateSheetData(SHEET.OVERVIEW);
         found = true; break;
       }
       if (!found) return "換人失敗：找不到原志工的排班紀錄。";
     } else {
-      var sr = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+      var sr = getSheetData(SHEET.SESSION_ROSTER);
       for (var ci2 = 1; ci2 < sr.length; ci2++) {
         if (sr[ci2][0] === dateStr && sr[ci2][1] === timeSlot && sr[ci2][2] == newVolunteer.id) return "換人失敗：代班志工已在此場次有排班。";
       }
       var sessionConfig2 = getSessionConfig(activityName, dateStr, timeSlot);
       if (sessionConfig2) {
-        var rsd = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
+        var rsd = getSheetData(SHEET.SESSION_ROSTER);
         var genCount = 0, newCount = 0;
         for (var ni = 1; ni < rsd.length; ni++) {
           if (rsd[ni][0] !== dateStr || rsd[ni][1] !== timeSlot || rsd[ni][2] == oldVolunteerId) continue;
@@ -1408,7 +1482,7 @@ function adminReplaceSchedule(activityName, scheduleSlot, oldVolunteerId, newVol
         else { if (genCount >= sessionConfig2.generalMax) return "換人失敗：該場次一般志工名額已滿。"; }
       }
       var rosterSheet = getSheet(SHEET.SESSION_ROSTER);
-      var rosterData  = rosterSheet.getDataRange().getDisplayValues();
+      var rosterData  = getSheetData(SHEET.SESSION_ROSTER);
       var foundRow    = -1;
       for (var j = rosterData.length - 1; j >= 1; j--) {
         if (rosterData[j][0] === dateStr && rosterData[j][1] === timeSlot && rosterData[j][2] == oldVolunteerId) { foundRow = j + 1; break; }
@@ -1417,6 +1491,7 @@ function adminReplaceSchedule(activityName, scheduleSlot, oldVolunteerId, newVol
       rosterSheet.getRange(foundRow, 3).setValue(newVolunteer.id);
       rosterSheet.getRange(foundRow, 4).setValue(newVolunteer.name);
       rosterSheet.getRange(foundRow, 5).setValue(newVolunteer.type);
+      invalidateSheetData(SHEET.SESSION_ROSTER);
     }
     deleteCalendarEvent(activity.calendarId, scheduleSlot, oldName);
     createCalendarEvent(activity.calendarId, scheduleSlot, newVolunteer.name);
@@ -1467,6 +1542,7 @@ function saveAdminSpecialDate(dateStr, activityName, type, timeSlots, maxPerSlot
       addedCount++;
     }
   }
+  invalidateSheetData(SHEET.SPECIAL_DATE);
   return addedCount > 0 ? "特殊日期設定已儲存（" + dateStr + "，共 " + addedCount + " 個時段）！" : "未新增任何時段，請確認輸入。";
 }
 
@@ -1481,6 +1557,7 @@ function deleteAdminSpecialDate(dateStr, activityName) {
   for (var i = data.length - 1; i >= 1; i--) {
     if (data[i][0] === dateStr && data[i][1] === activityName) { sheet.deleteRow(i + 1); count++; }
   }
+  invalidateSheetData(SHEET.SPECIAL_DATE);
   return count > 0 ? "已刪除特殊日期設定（共 " + count + " 筆）。" : "找不到對應設定。";
 }
 
@@ -1498,6 +1575,7 @@ function saveAdminSummerConfig(startDate, endDate, activityName, maxPerSlot, slo
   }
   var sheet = getSheet(SHEET.SUMMER);
   sheet.appendRow([normDate(startDate), normDate(endDate), activityName, parseInt(maxPerSlot) || 2, slotGroup || "平日2時段", note || ""]);
+  invalidateSheetData(SHEET.SUMMER);
   return "寒暑假設定已新增！";
 }
 
@@ -1510,6 +1588,7 @@ function updateAdminSummerConfig(rowIndex, startDate, endDate, activityName, max
   var sheet = getSheet(SHEET.SUMMER);
   if (rowIndex < 2 || rowIndex > sheet.getLastRow()) return "找不到對應設定。";
   sheet.getRange(rowIndex, 1, 1, 6).setValues([[normDate(startDate), normDate(endDate), activityName, parseInt(maxPerSlot) || 2, slotGroup || "平日2時段", note || ""]]);
+  invalidateSheetData(SHEET.SUMMER);
   return "寒暑假設定已更新！";
 }
 
@@ -1517,6 +1596,7 @@ function deleteAdminSummerConfig(rowIndex) {
   var sheet = getSheet(SHEET.SUMMER);
   if (rowIndex < 1 || rowIndex + 1 > sheet.getLastRow()) return "找不到對應設定。";
   sheet.deleteRow(rowIndex + 1);
+  invalidateSheetData(SHEET.SUMMER);
   return "已刪除寒暑假設定。";
 }
 
@@ -1584,6 +1664,7 @@ function applySpecialDatesToOverview(activityName) {
     }
     if (newCacheRows.length > 0) cacheSheet.getRange(cacheSheet.getLastRow()+1, 1, newCacheRows.length, 4).setValues(newCacheRows);
   } catch(e) { Logger.log("快取更新失敗：" + e.toString()); }
+  invalidateSheetData(SHEET.OVERVIEW);
   var msg = "套用完成！";
   if (addedCount   > 0) msg += "\n✅ 新增 " + addedCount   + " 個時段";
   if (removedCount > 0) msg += "\n🗑 移除 " + removedCount + " 個空白時段";
@@ -1592,9 +1673,7 @@ function applySpecialDatesToOverview(activityName) {
 }
 
 // ================================================
-// ★★★ 新增功能：缺額彙總（給首頁「缺額通知」折疊框使用）★★★
-// 低耗能版：不使用 CacheService 快取、不含推播，純資料彙總
-// 完全獨立新增函式，不影響上方任何既有邏輯
+// 缺額彙總（給首頁「缺額通知」折疊框使用）
 // ================================================
 function getVacancySummary(daysAhead) {
   daysAhead = daysAhead || 30;
@@ -1604,10 +1683,10 @@ function getVacancySummary(daysAhead) {
   var endDate = new Date(today);
   endDate.setDate(endDate.getDate() + daysAhead);
 
-  var overviewData  = getSheet(SHEET.OVERVIEW).getDataRange().getDisplayValues();
-  var sessionData   = getSheet(SHEET.SESSION).getDataRange().getDisplayValues();
-  var sessionRoster = getSheet(SHEET.SESSION_ROSTER).getDataRange().getDisplayValues();
-  var actData       = getSheet(SHEET.ACTIVITY).getDataRange().getDisplayValues();
+  var overviewData  = getSheetData(SHEET.OVERVIEW);
+  var sessionData   = getSheetData(SHEET.SESSION);
+  var sessionRoster = getSheetData(SHEET.SESSION_ROSTER);
+  var actData       = getSheetData(SHEET.ACTIVITY);
 
   var sessionCountMap = {};
   for (var r = 1; r < sessionRoster.length; r++) {
@@ -1675,4 +1754,237 @@ function getVacancySummary(daysAhead) {
   });
 
   return allSlots;
+}
+
+// ================================================
+// ★★★ v1.5：志工自助取消 ★★★
+// 規則：
+//   1. 每人每月 N 次（後台「自助取消月額度」，預設 2），跨所有活動累計
+//   2. 以「操作時間」的日曆月計，每月 1 日自動重置
+//   3. 值勤日前 N 天內（含當天）不可自助取消（後台「取消截止天數」，預設 7）
+//   4. 取消後時段立即釋放、Calendar 事件移除、通知志工與管理者
+//   5. 當月登記額度會回補（沿用原本「數現況」的計算方式）
+// ================================================
+
+/**
+ * 距離班次還有幾天（以日曆天計，不跳過休館日）
+ * 回傳 null 表示日期格式無法解析
+ */
+function daysUntilSlot(dateStr) {
+  var d = new Date(dateToISO(dateStr));
+  if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
+
+/**
+ * 計算該志工「本月」已使用的自助取消次數
+ * 只計 operation 為「取消排班（自助）」的紀錄，管理者取消不算
+ */
+function countSelfCancelThisMonth(volunteerId) {
+  var count = 0;
+  try {
+    var data = getSheetData(SHEET.FORM);
+    var now  = new Date();
+    var y = now.getFullYear(), m = now.getMonth() + 1;
+    var vid = volunteerId.toString().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][2].toString().trim() !== vid) continue;
+      // ★ 用關鍵字比對，避免全形括號或文字微調造成漏算
+      var op = data[i][5].toString();
+      if (op.indexOf("取消") < 0 || op.indexOf("自助") < 0) continue;
+      var ym = parseFormTimestampYM(data[i][0]);
+      if (!ym) continue;
+      if (ym.year === y && ym.month === m) count++;
+    }
+  } catch(e) {
+    Logger.log("countSelfCancelThisMonth 失敗：" + e.toString());
+  }
+  return count;
+}
+
+/**
+ * ★ v1.5.1 修正：解析「表單回應1」A欄的時間戳記，取出年與月
+ *
+ * getDisplayValues() 回傳的是顯示字串，例如「2026/8/3 下午 10:50:23」。
+ * 直接用 new Date() 會因為中文的「上午/下午」而解析失敗（Invalid Date），
+ * 導致取消次數永遠算成 0、額度形同虛設。
+ * 這裡改用正規表示式直接抓開頭的年/月，不受時間格式影響。
+ */
+function parseFormTimestampYM(raw) {
+  if (!raw) return null;
+  var s = raw.toString().trim();
+  var m = s.match(/^(\d{4})[\/\-](\d{1,2})/);
+  if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+  // 後備：若儲存格為真正的日期物件
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  return null;
+}
+
+/**
+ * 取得自助取消的額度狀態（給前端顯示用）
+ */
+function getSelfCancelInfo(volunteerId) {
+  var max  = getSelfCancelQuota();
+  var used = countSelfCancelThisMonth(volunteerId);
+  var now  = new Date();
+  var next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  var contact = getSystemConfig("管理者1_Email");
+  return {
+    used:         used,
+    max:          max,
+    remaining:    Math.max(0, max - used),
+    resetDate:    next.getFullYear() + "/" + (next.getMonth() + 1) + "/1",
+    deadlineDays: getCancelDeadlineDays(),
+    contactEmail: (contact && contact.trim()) ? contact.trim() : ""
+  };
+}
+
+/**
+ * 額度用完時顯示的提示文字
+ */
+function buildCancelContactHint() {
+  var email = getSystemConfig("管理者1_Email");
+  return (email && email.trim())
+    ? "如需取消請來信 " + email.trim()
+    : "如需取消請聯繫管理人員";
+}
+
+/**
+ * 志工自助取消排班（主函式）
+ * 回傳 { ok: bool, message: string, cancelInfo: {...} }
+ */
+function selfCancelSchedule(name, volunteerId, activityName, scheduleSlot) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    invalidateSheetData();
+
+    // ── 1. 身分驗證 ──
+    var volunteer = validateVolunteer(name, volunteerId);
+    if (!volunteer) {
+      return { ok: false, message: "取消失敗：姓名與編號不符。" };
+    }
+
+    var activity = getActivityConfig(activityName);
+    if (!activity) {
+      return { ok: false, message: "取消失敗：找不到活動設定。" };
+    }
+
+    var slotParts = scheduleSlot.split(" ");
+    if (slotParts.length < 2) {
+      return { ok: false, message: "取消失敗：時段格式錯誤。" };
+    }
+    var dateStr = slotParts[0], timeSlot = slotParts[1];
+
+    // ── 2. 截止天數檢查（後端必驗，不可只靠前端）──
+    var deadlineDays = getCancelDeadlineDays();
+    var daysLeft = daysUntilSlot(dateStr);
+    if (daysLeft === null) {
+      return { ok: false, message: "取消失敗：日期格式錯誤。" };
+    }
+    if (daysLeft <= deadlineDays) {
+      return {
+        ok: false,
+        message: "取消失敗：值勤日前 " + deadlineDays + " 天內不可自助取消。\n" + buildCancelContactHint() + "。",
+        cancelInfo: getSelfCancelInfo(volunteerId)
+      };
+    }
+
+    // ── 3. 額度檢查（後端必驗）──
+    var info = getSelfCancelInfo(volunteerId);
+    if (info.remaining <= 0) {
+      return {
+        ok: false,
+        message: "取消失敗：本月自助取消額度已用完（上限 " + info.max + " 次）。\n" +
+                 buildCancelContactHint() + "。\n額度將於 " + info.resetDate + " 重置。",
+        cancelInfo: info
+      };
+    }
+
+    var cancelTime = formatNow();
+    var note = "志工自助取消 @ " + cancelTime;
+
+    // ── 4. 釋放時段 ──
+    if (activity.type === ACTIVITY_TYPE.BINOCULAR) {
+      var overviewSheet = getSheet(SHEET.OVERVIEW);
+      var data  = getSheetData(SHEET.OVERVIEW);
+      var found = false;
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] !== activityName || data[i][1] !== dateStr || data[i][2] !== timeSlot) continue;
+        for (var v = 0; v < VOL_COLS.length; v++) {
+          if (data[i][VOL_COLS[v].id] == volunteerId) { found = true; break; }
+        }
+        if (found) break;
+      }
+      if (!found) {
+        return { ok: false, message: "取消失敗：找不到您在此時段的排班紀錄。", cancelInfo: info };
+      }
+      updateOverviewSheet(overviewSheet, activityName, scheduleSlot, volunteer.name, volunteer.id, "remove");
+    } else {
+      var rosterSheet = getSheet(SHEET.SESSION_ROSTER);
+      var rosterData  = getSheetData(SHEET.SESSION_ROSTER);
+      var deleted = false;
+      for (var j = rosterData.length - 1; j >= 1; j--) {
+        if (rosterData[j][0] === dateStr && rosterData[j][1] === timeSlot && rosterData[j][2] == volunteerId) {
+          rosterSheet.deleteRow(j + 1);
+          invalidateSheetData(SHEET.SESSION_ROSTER);
+          deleted = true;
+          break;
+        }
+      }
+      if (!deleted) {
+        return { ok: false, message: "取消失敗：找不到您在此場次的報名紀錄。", cancelInfo: info };
+      }
+      var sessionConfig = getSessionConfig(activityName, dateStr, timeSlot);
+      if (sessionConfig) updateSessionOverviewStatus(activityName, dateStr, timeSlot, sessionConfig);
+    }
+
+    // ── 5. 移除 Calendar 事件 ──
+    deleteCalendarEvent(activity.calendarId, scheduleSlot, volunteer.name);
+
+    // ── 6. 寫入紀錄（額度以此計算，operation 字串不可更動）──
+    logFormResponse(volunteer.name, volunteer.id, activityName, scheduleSlot, "取消排班（自助）", note, "取消");
+
+    // ── 7. 通知 ──
+    var newInfo = getSelfCancelInfo(volunteerId);
+    try {
+      if (volunteer.email) sendVolunteerSelfCancelNotification(volunteer, activityName, scheduleSlot, cancelTime, newInfo);
+      sendAdminSelfCancelNotification(volunteer, activityName, scheduleSlot, cancelTime);
+    } catch(e) {
+      Logger.log("自助取消通知發送失敗：" + e.toString());
+    }
+
+    return {
+      ok: true,
+      message: "已成功取消 " + scheduleSlot + " 的排班。\n本月尚可自助取消 " + newInfo.remaining + " 次。",
+      cancelInfo: newInfo
+    };
+
+  } catch(e) {
+    return { ok: false, message: "系統錯誤：" + e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 批次自助取消（前端限制最多勾選「剩餘額度」個）
+ */
+function selfCancelScheduleBatch(name, volunteerId, items) {
+  var results = [], successCount = 0, failCount = 0;
+  for (var i = 0; i < items.length; i++) {
+    var r = selfCancelSchedule(name, volunteerId, items[i].activityName, items[i].scheduleSlot);
+    results.push({ item: items[i], ok: r.ok, message: r.message });
+    if (r.ok) { successCount++; } else { failCount++; }
+  }
+  return {
+    results: results,
+    successCount: successCount,
+    failCount: failCount,
+    cancelInfo: getSelfCancelInfo(volunteerId)
+  };
 }
