@@ -73,13 +73,58 @@ function getSheet(sheetName) {
 }
 
 function getSystemConfig(key) {
-  var data = getSheet(SHEET.SYSTEM).getDataRange().getDisplayValues();
+  var data = getSheetData(SHEET.SYSTEM);
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] === key) return data[i][1];
   }
   return null;
 }
 
-function getAdminEmail() {
-  return getSystemConfig("管理者Email");
+// ================================================
+// 單次執行內的讀表快取
+// GAS 每次請求都是獨立執行環境,快取只存活於本次請求,
+// 請求結束即消失,不會有跨使用者的髒資料問題。
+// ================================================
+
+var _sheetDataCache = {};
+
+/**
+ * 取得整張工作表的 DisplayValues(本次執行內只讀一次)
+ */
+function getSheetData(sheetName) {
+  if (!_sheetDataCache.hasOwnProperty(sheetName)) {
+    _sheetDataCache[sheetName] = getSheet(sheetName).getDataRange().getDisplayValues();
+  }
+  return _sheetDataCache[sheetName];
+}
+
+/**
+ * 寫入工作表後呼叫,讓後續讀取拿到新資料
+ * 不帶參數 = 清除全部
+ */
+function invalidateSheetData(sheetName) {
+  if (sheetName) {
+    delete _sheetDataCache[sheetName];
+  } else {
+    _sheetDataCache = {};
+  }
+}
+// ================================================
+// 單次執行內的讀表快取
+// ================================================
+var _sheetDataCache = {};
+
+function getSheetData(sheetName) {
+  if (!_sheetDataCache.hasOwnProperty(sheetName)) {
+    _sheetDataCache[sheetName] = getSheet(sheetName).getDataRange().getDisplayValues();
+  }
+  return _sheetDataCache[sheetName];
+}
+
+function invalidateSheetData(sheetName) {
+  if (sheetName) {
+    delete _sheetDataCache[sheetName];
+  } else {
+    _sheetDataCache = {};
+  }
 }
