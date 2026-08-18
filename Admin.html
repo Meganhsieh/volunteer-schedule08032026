@@ -19,7 +19,7 @@
       display: none; position: fixed; top: 30px; left: 50%; transform: translateX(-50%);
       min-width: 280px; max-width: 90%; padding: 16px 24px; border-radius: 8px;
       font-size: 16px; font-weight: bold; text-align: center; z-index: 9999;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: opacity 0.5s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: opacity 0.5s ease; white-space: pre-line;
     }
     #toast-msg.success { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
     #toast-msg.error   { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
@@ -84,6 +84,14 @@
     .expiry-badge.expiring { background:#fff3cd; color:#856404; }
     .expiry-badge.active   { background:#d1e7dd; color:#0f5132; }
 
+    /* 參數設定區塊 */
+    .param-box { border-radius:10px; padding:16px 18px; margin-bottom:20px; }
+    .param-box.prior  { background:#fff8e1; border:1.5px solid #ffe082; }
+    .param-box.cancel { background:#f0f6ff; border:1.5px solid #90caf9; }
+    .param-box label.pl { font-size:0.92rem; display:flex; align-items:center; gap:6px; font-weight:bold; flex-wrap:wrap; }
+    .param-hint { font-size:0.82rem; color:#666; margin-top:6px; line-height:1.7; }
+    .warn-box { background:#fff5f5; border-left:4px solid #dc3545; border-radius:6px; padding:12px 16px; margin-bottom:16px; font-size:0.88rem; line-height:1.8; }
+
     #loginScreen { max-width:400px; margin:60px auto 0; background:white; padding:40px 36px; border-radius:14px; box-shadow:0 4px 20px rgba(0,0,0,0.12); }
     #loginScreen h3 { text-align:center; color:#0d6efd; font-weight:bold; margin-bottom:24px; font-size:1.4rem; }
   </style>
@@ -117,8 +125,8 @@
 
       <div style="border-bottom:1px solid #dee2e6; margin-bottom:5px; overflow-x:auto; white-space:nowrap;">
         <button class="tab-btn active" onclick="switchTab('activity', this)">活動管理</button>
-        <button class="tab-btn" onclick="switchTab('announce', this)">公告設定</button>
-        <button class="tab-btn" onclick="switchTab('quota', this)">📊 月份人數設定</button>
+        <button class="tab-btn" onclick="switchTab('announce', this)">📢 二觀公告登記月份設定</button>
+        <button class="tab-btn" onclick="switchTab('quota', this)">📊 二觀優先排班人數設定</button>
         <button class="tab-btn" onclick="switchTab('session', this)">場次設定</button>
         <button class="tab-btn" onclick="switchTab('volunteers', this)">👥 志工管理</button>
         <button class="tab-btn" onclick="switchTab('system', this)">系統設定</button>
@@ -146,7 +154,7 @@
         <button class="btn btn-primary" onclick="saveActivities()">💾 儲存活動設定</button>
       </div>
 
-      <!-- ===== 公告設定 ===== -->
+      <!-- ===== 二觀公告登記月份設定 ===== -->
       <div id="tab-announce" class="tab-content">
         <div class="section-title">新增公告日期（望遠鏡二觀）</div>
         <div class="mb-3">
@@ -164,19 +172,12 @@
         </div>
         <div class="mb-3">
           <label class="form-label">開放登記月份：</label>
-          <div style="margin-bottom:6px;">
-            <label style="font-size:0.88rem; cursor:pointer;"><input type="radio" name="monthMode" value="auto" checked onchange="toggleMonthMode()"> &nbsp;自動（公告日後第2個月）</label>
-            &nbsp;&nbsp;
-            <label style="font-size:0.88rem; cursor:pointer;"><input type="radio" name="monthMode" value="manual" onchange="toggleMonthMode()"> &nbsp;手動選擇月份</label>
+          <div class="text-muted mb-1" style="font-size:0.82rem;">請勾選要開放的月份，可複選（最多 6 個月）。</div>
+          <div class="month-checkboxes" id="monthCheckboxes"></div>
+          <div class="text-muted mt-2" style="font-size:0.82rem; line-height:1.8;">
+            💡 儲存後，請<strong>立即</strong>至「📊 二觀優先排班人數設定」頁籤設定該月份的人數與配額。<br>
+            未設定的月份將套用系統預設值（<strong>空白 = 不限制</strong>）。
           </div>
-          <div id="monthCheckboxArea" style="display:none;">
-            <div class="text-muted mb-2" style="font-size:0.82rem;">可複選多個月份（最多6個月）</div>
-            <div class="month-checkboxes" id="monthCheckboxes"></div>
-          </div>
-          <div id="monthAutoHint" style="font-size:0.85rem; color:#0d6efd; margin-top:4px;">
-            ℹ️ 將自動開放：<span id="autoMonthLabel">（請先選擇公告日期）</span>
-          </div>
-          <div class="text-muted mt-2" style="font-size:0.82rem;">💡 每月的服勤人數上限與配額，請至「📊 月份人數設定」頁籤設定。</div>
         </div>
         <button class="btn btn-primary" id="announceBtn" onclick="saveAnnounce()">儲存並自動產生時段</button>
         <span id="announceLoading" style="display:none; margin-left:12px; color:#666; font-size:0.9rem;">⏳ 產生時段中，請稍候...</span>
@@ -189,14 +190,53 @@
         <div id="announceList"><div class="text-muted text-center">載入中...</div></div>
       </div>
 
-      <!-- ===== 月份人數設定 ===== -->
+      <!-- ===== 二觀優先排班人數設定 ===== -->
       <div id="tab-quota" class="tab-content">
-        <div class="section-title">月份人數設定</div>
-        <p style="font-size:0.85rem; color:#888; margin-bottom:16px;">
-          設定每個月份的服勤人數上限與各類志工的排班配額。<br>
+
+        <!-- 優先期參數 -->
+        <div class="section-title">⚙️ 二觀優先排班參數設定</div>
+        <div class="param-box prior">
+          <label class="pl">
+            優先排班期時數：
+            <input type="number" class="form-control form-control-sm" id="sp-priorityHours" min="0" max="720" style="width:90px;"> 小時
+          </label>
+          <div class="param-hint">
+            公告開放登記後的這段時間內，套用下方的「優先期配額」；超過後改用「一般期配額」。<br>
+            <strong>僅適用二觀型活動。</strong>目前規劃值：48 小時。
+          </div>
+          <button class="btn btn-warning btn-sm" style="margin-top:10px;" onclick="saveQuotaParams()">💾 儲存參數</button>
+        </div>
+
+        <!-- 自助取消參數 -->
+        <div class="section-title">🎫 自助取消參數設定（適用所有活動）</div>
+        <div class="param-box cancel">
+          <div style="display:flex; gap:24px; flex-wrap:wrap;">
+            <label class="pl">
+              取消截止天數：
+              <input type="number" class="form-control form-control-sm" id="sp-cancelDeadlineDays" min="0" max="60" style="width:80px;"> 天
+            </label>
+            <label class="pl">
+              自助取消月額度：
+              <input type="number" class="form-control form-control-sm" id="sp-selfCancelQuota" min="0" max="20" style="width:80px;"> 次
+            </label>
+          </div>
+          <div class="param-hint">
+            <strong>取消截止天數</strong>：值勤日前這幾天內（含當天）不可自助取消，需聯繫管理人員。<br>
+            例：設 7 天，9/20 的班在 9/13 起就不能自助取消。以日曆天計算，不跳過休館日。<br>
+            <strong>自助取消月額度</strong>：每人每月可自助取消次數，<strong>跨所有活動累計</strong>，每月 1 日自動重置。<br>
+            <span style="color:#c62828;">※ 自助取消功能尚未上線，此設定將於功能上線後生效。</span>
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="saveQuotaParams()">💾 儲存參數</button>
+        </div>
+
+        <!-- 月份人數 -->
+        <div class="section-title">📊 各月份人數與配額</div>
+        <div class="warn-box">
+          <strong style="color:#c62828;">⚠️ 本設定僅適用二觀型活動（望遠鏡二觀）。</strong><br>
+          公告日期與開放登記月份確定後，請<strong>立即</strong>設定該月份的人數與配額。<br>
           空白 = 不限制；0 = 完全不可申請；數字 = 每月上限班次。<br>
-          未設定的月份套用系統設定的預設值。
-        </p>
+          未設定的月份將套用系統預設值。
+        </div>
 
         <!-- 新增 -->
         <div style="background:#f0f6ff;border:1.5px solid #90caf9;border-radius:10px;padding:16px 18px;margin-bottom:20px;">
@@ -220,7 +260,7 @@
             </div>
           </div>
           <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px;margin-bottom:8px;">
-            <div style="font-size:0.82rem;font-weight:bold;color:#e65100;margin-bottom:8px;">公告後前3天配額（空白=不限，0=不可申請）</div>
+            <div style="font-size:0.82rem;font-weight:bold;color:#e65100;margin-bottom:8px;">優先期配額（公告後 <span class="ph-label">48</span> 小時內）　空白=不限，0=不可申請</div>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
               <label style="font-size:0.82rem;">一般志工/通過驗收：<input type="number" class="form-control form-control-sm d-inline-block" id="nq-pgp" min="0" max="20" placeholder="不限" style="width:60px;"></label>
               <label style="font-size:0.82rem;">一般志工/未通過：<input type="number" class="form-control form-control-sm d-inline-block" id="nq-pgf" min="0" max="20" placeholder="不限" style="width:60px;"></label>
@@ -229,7 +269,7 @@
             </div>
           </div>
           <div style="background:#e8f4fd;border:1px solid #90caf9;border-radius:6px;padding:10px 12px;margin-bottom:12px;">
-            <div style="font-size:0.82rem;font-weight:bold;color:#1565c0;margin-bottom:8px;">第4天起配額（空白=不限，0=不可申請）</div>
+            <div style="font-size:0.82rem;font-weight:bold;color:#1565c0;margin-bottom:8px;">一般期配額（<span class="ph-label">48</span> 小時後）　空白=不限，0=不可申請</div>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
               <label style="font-size:0.82rem;">一般志工/通過驗收：<input type="number" class="form-control form-control-sm d-inline-block" id="nq-ngp" min="0" max="20" placeholder="不限" style="width:60px;"></label>
               <label style="font-size:0.82rem;">一般志工/未通過：<input type="number" class="form-control form-control-sm d-inline-block" id="nq-ngf" min="0" max="20" placeholder="不限" style="width:60px;"></label>
@@ -241,7 +281,7 @@
         </div>
 
         <div class="section-title">已設定的月份人數</div>
-        <div id="monthQuotaList"><div class="text-muted text-center">載入中...</div></div>
+        <div id="monthQuotaList"><div class="text-muted text-center">（切換至此頁籤時載入）</div></div>
       </div>
 
       <!-- ===== 場次設定 ===== -->
@@ -274,7 +314,6 @@
           <span class="vol-count-badge" id="volCountBadge">載入中...</span>
         </div>
 
-        <!-- 搜尋列 + 操作按鈕 -->
         <div id="volunteerSearchBox">
           <input type="text" class="form-control" id="volSearchInput" placeholder="🔍 搜尋姓名或編號..."
                  style="max-width:220px;" oninput="filterVolunteers()">
@@ -288,7 +327,6 @@
           <button class="btn btn-outline-primary btn-sm" onclick="loadVolunteers()">🔄 重新整理</button>
         </div>
 
-        <!-- 新增志工 inline 表單 -->
         <div id="addVolunteerRow" style="display:none; background:#e8f4fd; border-radius:10px; padding:14px 16px; margin-bottom:16px; border:1.5px solid #90caf9;">
           <div style="font-weight:bold; color:#0d6efd; margin-bottom:10px;">➕ 新增志工</div>
           <div class="row g-2 mb-2">
@@ -332,7 +370,6 @@
           </div>
         </div>
 
-        <!-- 志工資料表格 -->
         <div style="overflow-x:auto;">
           <table class="table table-sm table-bordered" id="volunteerTable">
             <thead class="table-light">
@@ -348,7 +385,7 @@
               </tr>
             </thead>
             <tbody id="volunteerTableBody">
-              <tr><td colspan="8" class="text-muted text-center py-3">載入中...</td></tr>
+              <tr><td colspan="8" class="text-muted text-center py-3">（切換至此頁籤時載入）</td></tr>
             </tbody>
           </table>
         </div>
@@ -371,6 +408,10 @@
         <div class="section-title">Email 通知觸發器</div>
         <p style="font-size:0.9rem;color:#666;">點下方按鈕設定每日自動通知（每天早上8點執行），只需設定一次。</p>
         <button class="btn btn-outline-primary" onclick="setupTrigger()">設定每日自動通知</button>
+        <div class="mt-3 text-muted" style="font-size:0.85rem;">
+          💡 排班相關參數（優先期時數、取消截止天數、自助取消月額度）請至
+          「📊 二觀優先排班人數設定」頁籤設定。
+        </div>
       </div>
 
       <!-- ===== 排班規則 ===== -->
@@ -383,6 +424,18 @@
         <div class="mb-3">
           <label class="form-label">規則內容：</label>
           <textarea class="form-control" id="ruleContent" rows="8" placeholder="請輸入排班規則說明..."></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">公告到期日：</label>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <input type="date" class="form-control" id="ruleExpiry" style="max-width:180px;" onchange="refreshRuleBadge()">
+            <span id="ruleExpiryBadge" class="expiry-badge"></span>
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearRuleExpiry()">清除（設為永久）</button>
+          </div>
+          <div class="text-muted mt-1" style="font-size:0.82rem; line-height:1.8;">
+            到期日當天仍顯示，隔天起自動從首頁「排班規則」區移除。留空表示永久顯示。<br>
+            ※ 到期只影響首頁顯示，<strong>不影響志工排班</strong>，資料也會保留在工作表中。
+          </div>
         </div>
         <button class="btn btn-primary" onclick="saveRule()">儲存規則</button>
         <div class="mt-2 text-muted" style="font-size:0.85rem;">※ 可使用換行分隔每條規則，封面將原格式顯示。</div>
@@ -439,7 +492,7 @@
           <div style="font-size:0.78rem; color:#888; margin-top:8px;">※ 新增後會覆蓋同日期+活動的舊設定。設定只影響「下次產生時段」。</div>
         </div>
         <div class="section-title">已設定的特殊日期</div>
-        <div id="specialDateList"><div class="text-muted text-center">載入中...</div></div>
+        <div id="specialDateList"><div class="text-muted text-center">（切換至此頁籤時載入）</div></div>
       </div>
 
       <!-- ===== 排班管理 ===== -->
@@ -474,7 +527,7 @@
     var loaded = { activity:false, session:false, system:false, rules:false, recent:false, cancel:false, specialdate:false, volunteers:false, announce:false, quota:false };
     var allRules = {}, recentRowCount = 0, cancelMode = 'volunteer', currentAdminEmail = '';
     var allVolunteers = [];
-    var sdEditDataMap = {};  // 特殊日期編輯資料暫存
+    var sdEditDataMap = {};
 
     // ===== 登入 =====
     function doLogin() {
@@ -489,7 +542,10 @@
             currentAdminEmail = email;
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('adminContent').style.display = 'block';
-            buildEmptyTable(); loadActivities(); updateMonthCheckboxes(); loadAnnounceList(); loadMonthQuotaList(); loadQuotaActivities();
+            // ★ v1.4：登入只載入活動管理頁需要的，其餘切頁籤時才載入（加快登入速度）
+            buildEmptyTable();
+            loadActivities();
+            updateMonthCheckboxes();
           } else {
             btn.disabled = false; btn.textContent = '登入';
             errDiv.textContent = 'Email 或密碼錯誤，請重新輸入。'; errDiv.style.display = 'block';
@@ -513,8 +569,8 @@
       if (tab === 'cancel'      && !loaded.cancel)      { loaded.cancel      = true; loadCancelActivities(); }
       if (tab === 'specialdate' && !loaded.specialdate) { loaded.specialdate = true; loadSpecialDates(); loadSpecialDateActivities(); }
       if (tab === 'volunteers'  && !loaded.volunteers)  { loaded.volunteers  = true; loadVolunteers(); }
-      if (tab === 'announce'    && !loaded.announce)    { loaded.announce    = true; loadAnnounceList(); loadMonthQuotaList(); }
-      if (tab === 'quota'       && !loaded.quota)       { loaded.quota       = true; loadMonthQuotaList(); loadQuotaActivities(); }
+      if (tab === 'announce'    && !loaded.announce)    { loaded.announce    = true; loadAnnounceList(); }
+      if (tab === 'quota'       && !loaded.quota)       { loaded.quota       = true; loadQuotaPage(); }
     }
 
     // ===== 活動管理 =====
@@ -561,18 +617,19 @@
         .saveAdminActivities(activities);
     }
 
-    // ===== 公告設定 =====
+    // ===== 二觀公告登記月份設定 =====
     function updateMonthCheckboxes() {
       var dateVal = document.getElementById('announceDate').value;
-      var container = document.getElementById('monthCheckboxes'), autoHint = document.getElementById('autoMonthLabel');
+      var container = document.getElementById('monthCheckboxes');
+      if (!container) return;
       container.innerHTML = '';
       var baseDate = dateVal ? new Date(dateVal) : new Date();
       if (isNaN(baseDate.getTime())) baseDate = new Date();
-      var autoMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() + 2, 1);
-      autoHint.textContent = autoMonth.getFullYear() + "年" + (autoMonth.getMonth() + 1) + "月";
       for (var i = 1; i <= 6; i++) {
         var m = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1);
-        var key = m.getFullYear() + "/" + (m.getMonth() + 1), lbl = m.getFullYear() + "年" + (m.getMonth() + 1) + "月", isD = (i === 2);
+        var key = m.getFullYear() + "/" + (m.getMonth() + 1);
+        var lbl = m.getFullYear() + "年" + (m.getMonth() + 1) + "月";
+        var isD = (i === 2);   // 預設勾選公告日後第 2 個月
         var item = document.createElement('label');
         item.className = 'month-check-item' + (isD ? ' checked' : '');
         item.innerHTML = '<input type="checkbox" value="' + key + '"' + (isD ? ' checked' : '') + '> ' + lbl;
@@ -583,26 +640,169 @@
       }
     }
 
-    function toggleMonthMode() {
-      var isManual = document.querySelector('input[name="monthMode"]:checked').value === 'manual';
-      document.getElementById('monthCheckboxArea').style.display = isManual ? 'block' : 'none';
-      document.getElementById('monthAutoHint').style.display = isManual ? 'none' : 'block';
+    function saveAnnounce() {
+      var date = document.getElementById('announceDate').value;
+      var time = document.getElementById('announceTime').value || '00:00';
+      var activity = document.getElementById('announceActivity').value;
+      if (!date) { showToast('請選擇公告日期。', false, 5000); return; }
+
+      var targetMonths = [];
+      document.querySelectorAll('#monthCheckboxes input[type=checkbox]:checked').forEach(function(chk) {
+        targetMonths.push(chk.value);
+      });
+      if (targetMonths.length === 0) { showToast('請至少勾選一個開放月份。', false, 5000); return; }
+
+      var btn = document.getElementById('announceBtn'), loading = document.getElementById('announceLoading'), result = document.getElementById('announceResult');
+      btn.disabled = true; btn.textContent = '處理中...'; loading.style.display = 'inline'; result.style.display = 'none';
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          btn.disabled = false; btn.textContent = '儲存並自動產生時段'; loading.style.display = 'none';
+          document.getElementById('announceResultMsg').textContent = msg;
+          result.style.display = 'block';
+          showToast('✅ ' + msg, true, 8000);
+          loadAnnounceList();
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false; btn.textContent = '儲存並自動產生時段'; loading.style.display = 'none';
+          showToast('儲存失敗：' + err, false, 5000);
+        })
+        .saveAnnounceDate(date, activity, time, targetMonths, null);
     }
 
-    function loadQuotaActivities() {
+    function loadAnnounceList() {
+      var div = document.getElementById('announceList');
+      if (!div) return;
+      div.innerHTML = '<div class="text-muted text-center">載入中...</div>';
       google.script.run
-        .withSuccessHandler(function(activities) {
-          var sel = document.getElementById('nq-activity');
-          if (!sel) return;
-          sel.innerHTML = '';
-          if (activities) activities.forEach(function(act) {
-            if (act.type === '二觀型' && act.name) {
-              var opt = document.createElement('option');
-              opt.value = act.name; opt.text = act.name;
-              sel.appendChild(opt);
-            }
+        .withSuccessHandler(function(list) {
+          if (!list || list.length === 0) { div.innerHTML = '<div class="text-muted text-center py-2">目前無公告設定</div>'; return; }
+          var html = '<table class="table table-sm table-bordered" style="font-size:0.85rem;"><thead class="table-light"><tr>' +
+            '<th>開放時間</th><th>活動</th><th>開放月份</th><th style="width:70px;">操作</th></tr></thead><tbody>';
+          list.forEach(function(a) {
+            var months = [a.month1, a.month2].filter(function(m){ return m; }).join('、');
+            html += '<tr>' +
+              '<td style="white-space:nowrap;font-weight:bold;">' + escHtml(a.openTime) + '</td>' +
+              '<td>' + escHtml(a.activity) + '</td>' +
+              '<td>' + escHtml(months) + '</td>' +
+              '<td><button class="btn-del" onclick="deleteAnnounce(' + a.rowIndex + ')">刪除</button></td>' +
+            '</tr>';
           });
-        }).getAdminActivities();
+          div.innerHTML = html + '</tbody></table>';
+        })
+        .withFailureHandler(function(err) { div.innerHTML = '<div class="text-danger text-center">載入失敗：' + escHtml(err) + '</div>'; })
+        .getAdminAnnounces();
+    }
+
+    function deleteAnnounce(rowIndex) {
+      if (!confirm('確定要刪除此公告設定？\n\n⚠️ 刪除後已產生的排班時段不受影響，但該月份將不再開放新申請。')) return;
+      google.script.run
+        .withSuccessHandler(function(msg) { showToast(msg, true, 5000); loadAnnounceList(); })
+        .withFailureHandler(function(err) { showToast('刪除失敗：' + err, false, 5000); })
+        .deleteAdminAnnounce(rowIndex);
+    }
+
+    // ===== 二觀優先排班人數設定（v1.4：合併為單次後端呼叫）=====
+    function loadQuotaPage() {
+      var div = document.getElementById('monthQuotaList');
+      if (div) div.innerHTML = '<div class="text-muted text-center">載入中...</div>';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res) return;
+
+          // 1) 參數
+          var p = res.params || {};
+          window._priorityHours = parseInt(p.priorityHours) || 48;
+          var el;
+          if ((el = document.getElementById('sp-priorityHours')))      el.value = p.priorityHours;
+          if ((el = document.getElementById('sp-cancelDeadlineDays'))) el.value = p.cancelDeadlineDays;
+          if ((el = document.getElementById('sp-selfCancelQuota')))    el.value = p.selfCancelQuota;
+          document.querySelectorAll('.ph-label').forEach(function(s) { s.textContent = window._priorityHours; });
+
+          // 2) 活動下拉（只列二觀型）
+          var sel = document.getElementById('nq-activity');
+          if (sel) {
+            sel.innerHTML = '';
+            (res.activities || []).forEach(function(name) {
+              var opt = document.createElement('option');
+              opt.value = name; opt.text = name;
+              sel.appendChild(opt);
+            });
+          }
+
+          // 3) 配額清單
+          renderQuotaList(res.quotas || []);
+        })
+        .withFailureHandler(function(err) {
+          if (div) div.innerHTML = '<div class="text-danger">載入失敗：' + escHtml(err) + '</div>';
+        })
+        .getQuotaPageData();
+    }
+
+    function saveQuotaParams() {
+      var h = document.getElementById('sp-priorityHours').value;
+      var d = document.getElementById('sp-cancelDeadlineDays').value;
+      var q = document.getElementById('sp-selfCancelQuota').value;
+      if (h === '' || d === '' || q === '') { showToast('請填寫所有參數。', false, 4000); return; }
+      if (parseInt(h) < 0 || parseInt(d) < 0 || parseInt(q) < 0) { showToast('數值不可為負數。', false, 4000); return; }
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          showToast(msg, true, 6000);
+          loaded.quota = false;
+          loadQuotaPage();
+        })
+        .withFailureHandler(function(err) { showToast('儲存失敗：' + err, false, 5000); })
+        .saveSystemParams({
+          priorityHours:      parseInt(h),
+          cancelDeadlineDays: parseInt(d),
+          selfCancelQuota:    parseInt(q)
+        });
+    }
+
+    function renderQuotaList(list) {
+      var div = document.getElementById('monthQuotaList');
+      if (!div) return;
+      if (!list || list.length === 0) {
+        div.innerHTML = '<div class="text-muted text-center py-2">目前無月份人數設定（全部使用預設值：平日1人、假日2人）</div>';
+        return;
+      }
+      var ph = window._priorityHours || 48;
+      function qLabel(v) { return v === '' || v === null || v === undefined ? '不限' : (v === 0 ? '❌不可' : v+'班'); }
+      var html = '<table class="table table-sm table-bordered" style="font-size:0.8rem;">' +
+        '<thead class="table-light"><tr>' +
+        '<th>活動</th><th>年月</th><th>平日</th><th>假日</th>' +
+        '<th colspan="4" style="background:#fff8e1;color:#e65100;">優先期配額（' + ph + 'h 內）</th>' +
+        '<th colspan="4" style="background:#e8f4fd;color:#1565c0;">一般期配額（' + ph + 'h 後）</th>' +
+        '<th style="width:100px;">操作</th></tr>' +
+        '<tr class="table-light"><th></th><th></th><th></th><th></th>' +
+        '<th style="font-size:0.72rem;">一般/通過</th><th style="font-size:0.72rem;">一般/未通過</th><th style="font-size:0.72rem;">新/通過</th><th style="font-size:0.72rem;">新/未通過</th>' +
+        '<th style="font-size:0.72rem;">一般/通過</th><th style="font-size:0.72rem;">一般/未通過</th><th style="font-size:0.72rem;">新/通過</th><th style="font-size:0.72rem;">新/未通過</th>' +
+        '<th></th></tr></thead><tbody>';
+
+      window._quotaEditMap = {};
+      list.forEach(function(q, idx) {
+        var mapKey = 'q_' + idx;
+        window._quotaEditMap[mapKey] = q;
+        html += '<tr>' +
+          '<td>'+escHtml(q.activity)+'</td>' +
+          '<td style="font-weight:bold;">'+escHtml(q.yearMonth)+'</td>' +
+          '<td style="text-align:center;">'+q.weekdayMax+'人</td>' +
+          '<td style="text-align:center;">'+q.holidayMax+'人</td>' +
+          '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_general_pass)+'</td>' +
+          '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_general_fail)+'</td>' +
+          '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_new_pass)+'</td>' +
+          '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_new_fail)+'</td>' +
+          '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_general_pass)+'</td>' +
+          '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_general_fail)+'</td>' +
+          '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_new_pass)+'</td>' +
+          '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_new_fail)+'</td>' +
+          '<td style="white-space:nowrap;">' +
+            '<button class="btn-edit" style="margin-right:4px;" onclick="showQuotaEditByKey(\'' + mapKey + '\')">✏️</button>' +
+            '<button class="btn-del" onclick="deleteQuota(' + q.rowIndex + ')">🗑</button>' +
+          '</td></tr>';
+      });
+      html += '</tbody></table><div id="quotaEditBox" style="display:none;"></div>';
+      div.innerHTML = html;
     }
 
     function addMonthQuota() {
@@ -625,89 +825,12 @@
       google.script.run
         .withSuccessHandler(function(msg) {
           showToast('已儲存！', true, 5000);
-          loadMonthQuotaList();
-          // 清空輸入
+          loadQuotaPage();
           document.getElementById('nq-yearmonth').value = '';
           ['nq-pgp','nq-pgf','nq-pnp','nq-pnf','nq-ngp','nq-ngf','nq-nnp','nq-nnf'].forEach(function(id){ document.getElementById(id).value=''; });
         })
         .withFailureHandler(function(err) { showToast('儲存失敗：' + err, false, 5000); })
         .saveMonthQuotas(activity, [quota]);
-    }
-
-    function saveAnnounce() {
-      var date = document.getElementById('announceDate').value, time = document.getElementById('announceTime').value || '00:00';
-      var activity = document.getElementById('announceActivity').value;
-      if (!date) { showToast('請選擇公告日期。', false, 5000); return; }
-      var isManual = document.querySelector('input[name="monthMode"]:checked').value === 'manual', targetMonths = null;
-      if (isManual) {
-        targetMonths = [];
-        document.querySelectorAll('#monthCheckboxes input[type=checkbox]:checked').forEach(function(chk) { targetMonths.push(chk.value); });
-        if (targetMonths.length === 0) { showToast('請至少選擇一個開放月份。', false, 5000); return; }
-      }
-      var btn = document.getElementById('announceBtn'), loading = document.getElementById('announceLoading'), result = document.getElementById('announceResult');
-      btn.disabled = true; btn.textContent = '處理中...'; loading.style.display = 'inline'; result.style.display = 'none';
-      google.script.run
-        .withSuccessHandler(function(msg) {
-          btn.disabled = false; btn.textContent = '儲存並自動產生時段'; loading.style.display = 'none';
-          document.getElementById('announceResultMsg').textContent = msg; result.style.display = 'block';
-          showToast('✅ ' + msg, true, 8000);
-          loadAnnounceList();
-        })
-        .withFailureHandler(function(err) { btn.disabled = false; btn.textContent = '儲存並自動產生時段'; loading.style.display = 'none'; showToast('儲存失敗：' + err, false, 5000); })
-        .saveAnnounceDate(date, activity, time, targetMonths, null);
-    }
-
-    function loadMonthQuotaList() {
-      var div = document.getElementById('monthQuotaList');
-      if (!div) return;
-      div.innerHTML = '<div class="text-muted text-center">載入中...</div>';
-      google.script.run
-        .withSuccessHandler(function(list) {
-          if (!list || list.length === 0) {
-            div.innerHTML = '<div class="text-muted text-center py-2">目前無月份人數設定（全部使用預設值：平日1人、假日2人）</div>';
-            return;
-          }
-          function qLabel(v) { return v === '' || v === null || v === undefined ? '不限' : (v === 0 ? '❌不可' : v+'班'); }
-          var html = '<table class="table table-sm table-bordered" style="font-size:0.8rem;">' +
-            '<thead class="table-light"><tr>' +
-            '<th>活動</th><th>年月</th><th>平日</th><th>假日</th>' +
-            '<th colspan="4" style="background:#fff8e1;color:#e65100;">公告前3天配額</th>' +
-            '<th colspan="4" style="background:#e8f4fd;color:#1565c0;">第4天起配額</th>' +
-            '<th style="width:100px;">操作</th></tr>' +
-            '<tr class="table-light"><th></th><th></th><th></th><th></th>' +
-            '<th style="font-size:0.72rem;">一般/通過</th><th style="font-size:0.72rem;">一般/未通過</th><th style="font-size:0.72rem;">新/通過</th><th style="font-size:0.72rem;">新/未通過</th>' +
-            '<th style="font-size:0.72rem;">一般/通過</th><th style="font-size:0.72rem;">一般/未通過</th><th style="font-size:0.72rem;">新/通過</th><th style="font-size:0.72rem;">新/未通過</th>' +
-            '<th></th></tr></thead><tbody>';
-
-          // ★ 用暫存 map 避免 JSON.stringify 嵌入 onclick 造成引號衝突
-          window._quotaEditMap = {};
-
-          list.forEach(function(q, idx) {
-            var mapKey = 'q_' + idx;
-            window._quotaEditMap[mapKey] = q;
-            html += '<tr>' +
-              '<td>'+escHtml(q.activity)+'</td>' +
-              '<td style="font-weight:bold;">'+escHtml(q.yearMonth)+'</td>' +
-              '<td style="text-align:center;">'+q.weekdayMax+'人</td>' +
-              '<td style="text-align:center;">'+q.holidayMax+'人</td>' +
-              '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_general_pass)+'</td>' +
-              '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_general_fail)+'</td>' +
-              '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_new_pass)+'</td>' +
-              '<td style="text-align:center;background:#fffde7;">'+qLabel(q.prior_new_fail)+'</td>' +
-              '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_general_pass)+'</td>' +
-              '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_general_fail)+'</td>' +
-              '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_new_pass)+'</td>' +
-              '<td style="text-align:center;background:#e3f2fd;">'+qLabel(q.normal_new_fail)+'</td>' +
-              '<td style="white-space:nowrap;">' +
-                '<button class="btn-edit" style="margin-right:4px;" onclick="showQuotaEditByKey(\''+mapKey+'\')">✏️</button>' +
-                '<button class="btn-del" onclick="deleteQuota('+q.rowIndex+')">🗑</button>' +
-              '</td></tr>';
-          });
-          html += '</tbody></table><div id="quotaEditBox" style="display:none;"></div>';
-          div.innerHTML = html;
-        })
-        .withFailureHandler(function(err) { div.innerHTML = '<div class="text-danger">載入失敗：' + escHtml(err) + '</div>'; })
-        .getAdminMonthQuotas();
     }
 
     function showQuotaEditByKey(mapKey) {
@@ -719,6 +842,7 @@
     function showQuotaEdit(rowIndex, q) {
       var box = document.getElementById('quotaEditBox');
       if (!box) return;
+      var ph = window._priorityHours || 48;
       function inp(key, val, label) {
         var v = (val === '' || val === null || val === undefined) ? '' : val;
         return '<label style="font-size:0.82rem;display:flex;align-items:center;gap:4px;">'+label+'：' +
@@ -732,7 +856,7 @@
           '<label style="font-size:0.88rem;display:flex;align-items:center;gap:4px;">假日每時段：<input type="number" class="form-control form-control-sm" id="qe-holiday" value="'+q.holidayMax+'" min="0" max="10" style="width:60px;"> 人</label>' +
         '</div>' +
         '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:8px 10px;margin-bottom:8px;">' +
-          '<div style="font-size:0.82rem;font-weight:bold;color:#e65100;margin-bottom:6px;">公告後前3天配額</div>' +
+          '<div style="font-size:0.82rem;font-weight:bold;color:#e65100;margin-bottom:6px;">優先期配額（公告後 ' + ph + ' 小時內）</div>' +
           '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
             inp('prior_gp', q.prior_general_pass, '一般/通過驗收') +
             inp('prior_gf', q.prior_general_fail, '一般/未通過') +
@@ -741,7 +865,7 @@
           '</div>' +
         '</div>' +
         '<div style="background:#e8f4fd;border:1px solid #90caf9;border-radius:6px;padding:8px 10px;margin-bottom:10px;">' +
-          '<div style="font-size:0.82rem;font-weight:bold;color:#1565c0;margin-bottom:6px;">第4天起配額</div>' +
+          '<div style="font-size:0.82rem;font-weight:bold;color:#1565c0;margin-bottom:6px;">一般期配額（' + ph + ' 小時後）</div>' +
           '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
             inp('normal_gp', q.normal_general_pass, '一般/通過驗收') +
             inp('normal_gf', q.normal_general_fail, '一般/未通過') +
@@ -767,7 +891,7 @@
         .withSuccessHandler(function(msg) {
           showToast(msg, true, 5000);
           document.getElementById('quotaEditBox').style.display = 'none';
-          loadMonthQuotaList();
+          loadQuotaPage();
         })
         .withFailureHandler(function(err) { showToast('儲存失敗：' + err, false, 5000); })
         .updateMonthQuota(rowIndex, activity, yearMonth,
@@ -779,43 +903,9 @@
     function deleteQuota(rowIndex) {
       if (!confirm('確定要刪除此月份人數設定？\n刪除後該月份將套用預設值（平日1人、假日2人）。')) return;
       google.script.run
-        .withSuccessHandler(function(msg) { showToast(msg, true, 5000); loadMonthQuotaList(); })
+        .withSuccessHandler(function(msg) { showToast(msg, true, 5000); loadQuotaPage(); })
         .withFailureHandler(function(err) { showToast('刪除失敗：' + err, false, 5000); })
         .deleteMonthQuota(rowIndex);
-    }
-
-    function loadAnnounceList() {
-      var div = document.getElementById('announceList');
-      if (!div) return;
-      div.innerHTML = '<div class="text-muted text-center">載入中...</div>';
-      google.script.run
-        .withSuccessHandler(function(list) {
-          if (!list || list.length === 0) { div.innerHTML = '<div class="text-muted text-center py-2">目前無公告設定</div>'; return; }
-          var WEEKDAYS = ['日','一','二','三','四','五','六'];
-          var html = '<table class="table table-sm table-bordered" style="font-size:0.85rem;"><thead class="table-light"><tr>' +
-            '<th>開放時間</th><th>活動</th><th>開放月份</th><th style="width:70px;">操作</th></tr></thead><tbody>';
-          list.forEach(function(a) {
-            var esc2 = function(v) { return String(v).replace(/'/g,"\\'"); };
-            var months = [a.month1, a.month2].filter(function(m){ return m; }).join('、');
-            html += '<tr>' +
-              '<td style="white-space:nowrap;font-weight:bold;">' + escHtml(a.openTime) + '</td>' +
-              '<td>' + escHtml(a.activity) + '</td>' +
-              '<td>' + escHtml(months) + '</td>' +
-              '<td><button class="btn-del" onclick="deleteAnnounce(' + a.rowIndex + ')">刪除</button></td>' +
-            '</tr>';
-          });
-          div.innerHTML = html + '</tbody></table>';
-        })
-        .withFailureHandler(function(err) { div.innerHTML = '<div class="text-danger text-center">載入失敗：' + escHtml(err) + '</div>'; })
-        .getAdminAnnounces();
-    }
-
-    function deleteAnnounce(rowIndex) {
-      if (!confirm('確定要刪除此公告設定？\n\n⚠️ 刪除後已產生的排班時段不受影響，但該月份將不再開放新申請。')) return;
-      google.script.run
-        .withSuccessHandler(function(msg) { showToast(msg, true, 5000); loadAnnounceList(); })
-        .withFailureHandler(function(err) { showToast('刪除失敗：' + err, false, 5000); })
-        .deleteAdminAnnounce(rowIndex);
     }
 
     // ===== 志工管理 =====
@@ -866,25 +956,24 @@
             '<td style="text-align:center;">'+certBadge(v.venueCert)+'</td>' +
             '<td style="font-size:0.82rem;color:#555;">'+escHtml(v.email)+'</td>' +
             '<td style="white-space:nowrap;">' +
-              '<button class="btn-edit" style="margin-right:4px;" ' +
-                'onclick="showVolEditRow(\''+rowId+'\',\''+esc2(v.id)+'\',\''+esc2(v.name)+'\',\''+esc2(v.type)+'\',\''+esc2(v.teleCert)+'\',\''+esc2(v.venueCert)+'\',\''+esc2(v.email)+'\')">✏️ 編輯</button>' +
+              '<button class="btn-edit" style="margin-right:4px;" onclick="showVolEditRow(\''+rowId+'\')">✏️ 編輯</button>' +
               '<button class="btn-del" onclick="deleteVolunteer('+v.rowIndex+',\''+esc2(v.id)+'\',\''+esc2(v.name)+'\')">🗑 刪除</button>' +
             '</td>' +
           '</tr>' +
           '<tr id="vol-edit-'+rowId+'" style="display:none;" class="vol-edit-row">' +
             '<td></td>' +
-            '<td><input type="text"  id="ve-id-'+rowId+'"    value="'+escHtml(v.id)+'    " class="form-control" style="width:90px;"></td>' +
-            '<td><input type="text"  id="ve-name-'+rowId+'"  value="'+escHtml(v.name)+'  " class="form-control" style="width:90px;"></td>' +
+            '<td><input type="text"  id="ve-id-'+rowId+'"    value="'+escHtml(v.id)+'" class="form-control" style="width:90px;"></td>' +
+            '<td><input type="text"  id="ve-name-'+rowId+'"  value="'+escHtml(v.name)+'" class="form-control" style="width:90px;"></td>' +
             '<td><select id="ve-type-'+rowId+'" class="form-control">' +
               '<option value="一般志工"'+(v.type==='一般志工'?' selected':'')+'>一般志工</option>' +
-              '<option value="新志工"  '+(v.type==='新志工'?' selected':'')+'>新志工</option>' +
+              '<option value="新志工"'+(v.type==='新志工'?' selected':'')+'>新志工</option>' +
             '</select></td>' +
             '<td><select id="ve-tele-'+rowId+'" class="form-control">' +
-              '<option value="通過"  '+(v.teleCert==='通過'?' selected':'')+'>通過</option>' +
+              '<option value="通過"'+(v.teleCert==='通過'?' selected':'')+'>通過</option>' +
               '<option value="未通過"'+(v.teleCert!=='通過'?' selected':'')+'>未通過</option>' +
             '</select></td>' +
             '<td><select id="ve-venue-'+rowId+'" class="form-control">' +
-              '<option value="通過"  '+(v.venueCert==='通過'?' selected':'')+'>通過</option>' +
+              '<option value="通過"'+(v.venueCert==='通過'?' selected':'')+'>通過</option>' +
               '<option value="未通過"'+(v.venueCert!=='通過'?' selected':'')+'>未通過</option>' +
             '</select></td>' +
             '<td><input type="email" id="ve-email-'+rowId+'" value="'+escHtml(v.email)+'" class="form-control" placeholder="（選填）"></td>' +
@@ -901,11 +990,6 @@
     function showVolEditRow(rowId) {
       document.getElementById('vol-row-'+rowId).style.display  = 'none';
       document.getElementById('vol-edit-'+rowId).style.display = '';
-      // trim whitespace padding from value fields
-      ['ve-id-','ve-name-','ve-email-'].forEach(function(prefix) {
-        var el = document.getElementById(prefix + rowId);
-        if (el) el.value = el.value.trim();
-      });
     }
     function hideVolEditRow(rowId) {
       document.getElementById('vol-row-'+rowId).style.display  = '';
@@ -1007,33 +1091,6 @@
         }).getAdminActivities();
     }
 
-    function applySpecialDates() {
-      var activity = document.getElementById('applySpecialActivity').value;
-      if (!activity) { showToast('請選擇活動。', false, 4000); return; }
-      var btn     = document.querySelector('button[onclick="applySpecialDates()"]');
-      var loading = document.getElementById('applySpecialLoading');
-      var result  = document.getElementById('applySpecialResult');
-      btn.disabled = true; loading.style.display = 'inline'; result.style.display = 'none';
-      google.script.run
-        .withSuccessHandler(function(msg) {
-          btn.disabled = false; loading.style.display = 'none';
-          result.style.display = 'block';
-          var isSuccess = msg.indexOf('套用完成') >= 0;
-          result.style.background = isSuccess ? '#d1e7dd' : '#fff3cd';
-          result.style.border     = isSuccess ? '1px solid #badbcc' : '1px solid #ffc107';
-          result.style.color      = isSuccess ? '#0f5132' : '#856404';
-          result.textContent = msg;
-          showToast(msg.split('\n')[0], isSuccess, 8000);
-          // 重新整理排班總覽（讓前台 cache 失效）
-          loaded.specialdate = false;
-          loadSpecialDates();
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false; loading.style.display = 'none';
-          showToast('套用失敗：' + err, false, 5000);
-        })
-        .applySpecialDatesToOverview(activity);
-    }
     function loadSpecialDates() {
       document.getElementById('specialDateList').innerHTML = '<div class="text-muted text-center">載入中...</div>';
       google.script.run
@@ -1054,7 +1111,6 @@
           sdEditDataMap = {};
           sortedKeys.forEach(function(key) {
             var g = groups[key], esc2 = function(v) { return String(v).replace(/'/g,"\\'"); };
-            // 計算星期
             var weekdayLabel = '';
             try {
               var dp = g.date.split('/');
@@ -1079,8 +1135,7 @@
               '</td>' +
             '</tr>';
           });
-          div.innerHTML = html + '</tbody></table>' +
-            '<div id="sdEditBox" style="display:none;"></div>';
+          div.innerHTML = html + '</tbody></table><div id="sdEditBox" style="display:none;"></div>';
         })
         .withFailureHandler(function(err) { showToast('載入失敗：' + err, false, 5000); })
         .getAdminSpecialDates();
@@ -1150,7 +1205,6 @@
       }
       google.script.run
         .withSuccessHandler(function(msg) {
-          // 自動套用到排班總覽
           google.script.run
             .withSuccessHandler(function(applyMsg) {
               showToast(msg + '\n' + applyMsg, true, 8000);
@@ -1167,6 +1221,7 @@
         .withFailureHandler(function(err) { showToast('儲存失敗：' + err, false, 5000); })
         .updateAdminSpecialDate(date, activity, type, timeSlots, max, enabled, note);
     }
+
     function addSpecialDate() {
       var date = document.getElementById('sd-date').value, activity = document.getElementById('sd-activity').value;
       var type = document.getElementById('sd-type').value, max = document.getElementById('sd-max').value, note = document.getElementById('sd-note').value;
@@ -1177,13 +1232,11 @@
         ['sd-slot-am','sd-slot-pm','sd-slot-eve'].forEach(function(id) { var el = document.getElementById(id); if (el && el.checked) timeSlots.push(el.value); });
         if (timeSlots.length === 0) { showToast('請至少勾選一個時段。', false, 4000); return; }
       }
-      // 顯示處理中
       var btn = document.querySelector('button[onclick="addSpecialDate()"]');
       if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
 
       google.script.run
         .withSuccessHandler(function(msg) {
-          // 儲存成功後，自動套用到排班總覽
           google.script.run
             .withSuccessHandler(function(applyMsg) {
               if (btn) { btn.disabled = false; btn.textContent = '新增'; }
@@ -1207,129 +1260,13 @@
         })
         .saveAdminSpecialDate(date, activity, type, timeSlots, max, enabled, note);
     }
+
     function deleteSpecialDate(date, activity) {
       if (!confirm('確定要刪除「'+date+' '+activity+'」的所有特殊日期設定？')) return;
       google.script.run
         .withSuccessHandler(function(msg) { showToast(msg, true, 5000); loadSpecialDates(); })
         .withFailureHandler(function(err) { showToast('刪除失敗：' + err, false, 5000); })
         .deleteAdminSpecialDate(date, activity);
-    }
-
-    // ===== 暑假設定 =====
-    function loadSummerActivities() {
-      google.script.run
-        .withSuccessHandler(function(activities) {
-          var sel = document.getElementById('sv-activity'); sel.innerHTML = '';
-          if (activities) activities.forEach(function(act) {
-            if (act.type === '二觀型' && act.name) { var opt = document.createElement('option'); opt.value = act.name; opt.text = act.name; sel.appendChild(opt); }
-          });
-        }).getAdminActivities();
-    }
-    function loadSummerConfigs() {
-      document.getElementById('summerList').innerHTML = '<div class="text-muted text-center">載入中...</div>';
-      google.script.run
-        .withSuccessHandler(function(configs) {
-          var div = document.getElementById('summerList');
-          if (!configs || configs.length === 0) { div.innerHTML = '<div class="text-muted text-center py-3">目前無寒暑假設定</div>'; return; }
-          var html = '<table class="table table-sm table-bordered" style="font-size:0.85rem;"><thead class="table-light"><tr>' +
-            '<th>#</th><th>起始日期</th><th>結束日期</th><th>活動</th><th>人數上限</th><th>平假日時段組</th><th>備註</th><th style="width:120px;">操作</th></tr></thead><tbody>';
-          configs.forEach(function(c, idx) {
-            var rowIndex = idx + 2; // Sheet row (1 header + idx)
-            var esc2 = function(v) { return String(v).replace(/'/g,"\\'"); };
-            html += '<tr>' +
-              '<td style="text-align:center;color:#888;">'+(idx+1)+'</td>' +
-              '<td style="font-weight:bold;">'+escHtml(c.startDate)+'</td>' +
-              '<td style="font-weight:bold;">'+escHtml(c.endDate)+'</td>' +
-              '<td>'+escHtml(c.activity)+'</td>' +
-              '<td style="text-align:center;">'+c.maxPerSlot+' 人</td>' +
-              '<td>'+escHtml(c.slotGroup)+'</td>' +
-              '<td style="color:#888;font-size:0.82rem;">'+escHtml(c.note)+'</td>' +
-              '<td style="white-space:nowrap;">' +
-                '<button class="btn-edit" style="margin-right:4px;" onclick="showSummerEdit('+rowIndex+',\''+esc2(c.startDate)+'\',\''+esc2(c.endDate)+'\',\''+esc2(c.activity)+'\','+c.maxPerSlot+',\''+esc2(c.slotGroup)+'\',\''+esc2(c.note)+'\')">✏️ 編輯</button>' +
-                '<button class="btn-del" onclick="deleteSummerConfig('+(idx+1)+')">🗑 刪除</button>' +
-              '</td>' +
-            '</tr>';
-          });
-          div.innerHTML = html + '</tbody></table><div id="svEditBox" style="display:none;"></div>';
-        })
-        .withFailureHandler(function(err) { showToast('載入失敗：' + err, false, 5000); })
-        .getAdminSummerConfigs();
-    }
-
-    function showSummerEdit(rowIndex, startDate, endDate, activity, maxPerSlot, slotGroup, note) {
-      var box = document.getElementById('svEditBox');
-      if (!box) return;
-      // Convert YYYY/M/D to YYYY-MM-DD for date input
-      function toInputDate(d) {
-        if (!d) return '';
-        var p = d.split('/');
-        if (p.length !== 3) return d;
-        return p[0] + '-' + (p[1].length<2?'0'+p[1]:p[1]) + '-' + (p[2].length<2?'0'+p[2]:p[2]);
-      }
-      box.innerHTML =
-        '<div style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:10px;padding:14px 16px;margin-top:12px;">' +
-        '<div style="font-weight:bold;color:#e65100;margin-bottom:10px;">✏️ 編輯寒暑假設定（第 '+(rowIndex-1)+' 筆）</div>' +
-        '<div class="row g-2 mb-2">' +
-          '<div class="col-auto"><label style="font-size:0.82rem;" class="form-label">起始日期：</label><input type="date" class="form-control form-control-sm" id="sve-start" value="'+toInputDate(startDate)+'" style="width:150px;"></div>' +
-          '<div class="col-auto"><label style="font-size:0.82rem;" class="form-label">結束日期：</label><input type="date" class="form-control form-control-sm" id="sve-end" value="'+toInputDate(endDate)+'" style="width:150px;"></div>' +
-          '<div class="col-auto"><label style="font-size:0.82rem;" class="form-label">活動：</label><input type="text" class="form-control form-control-sm" id="sve-activity" value="'+escHtml(activity)+'" style="width:160px;" readonly style="background:#f8f9fa;"></div>' +
-        '</div>' +
-        '<div class="row g-2 mb-2">' +
-          '<div class="col-auto"><label style="font-size:0.82rem;" class="form-label">人數上限：</label><input type="number" class="form-control form-control-sm" id="sve-max" value="'+maxPerSlot+'" min="1" style="width:80px;"></div>' +
-          '<div class="col-auto"><label style="font-size:0.82rem;" class="form-label">平假日時段組：</label>' +
-          '<select class="form-control form-control-sm" id="sve-slotgroup" style="width:220px;">' +
-            '<option value="平日2時段"'+(slotGroup==='平日2時段'||slotGroup==='平日2段'?' selected':'')+'>平日2時段（上午+下午）</option>' +
-            '<option value="假日3時段"'+(slotGroup==='假日3時段'||slotGroup==='假日3段'?' selected':'')+'>假日3時段（上午+下午+晚上）</option>' +
-          '</select></div>' +
-          '<div class="col"><label style="font-size:0.82rem;" class="form-label">備註：</label><input type="text" class="form-control form-control-sm" id="sve-note" value="'+escHtml(note)+'" placeholder="例：2025暑假"></div>' +
-        '</div>' +
-        '<div style="display:flex;gap:8px;">' +
-          '<button class="btn btn-warning btn-sm" onclick="saveSummerEdit('+rowIndex+')">💾 儲存</button>' +
-          '<button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById(\'svEditBox\').style.display=\'none\'">取消</button>' +
-        '</div></div>';
-      box.style.display = 'block';
-      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    function saveSummerEdit(rowIndex) {
-      var start    = document.getElementById('sve-start').value;
-      var end      = document.getElementById('sve-end').value;
-      var activity = document.getElementById('sve-activity').value;
-      var max      = document.getElementById('sve-max').value;
-      var slot     = document.getElementById('sve-slotgroup').value;
-      var note     = document.getElementById('sve-note').value;
-      if (!start || !end) { showToast('請選擇起始和結束日期。', false, 4000); return; }
-      if (start > end)    { showToast('起始日期不可晚於結束日期。', false, 4000); return; }
-      google.script.run
-        .withSuccessHandler(function(msg) {
-          showToast(msg, true, 6000);
-          document.getElementById('svEditBox').style.display = 'none';
-          loaded.summer = false; loadSummerConfigs();
-        })
-        .withFailureHandler(function(err) { showToast('儲存失敗：' + err, false, 5000); })
-        .updateAdminSummerConfig(rowIndex, start, end, activity, max, slot, note);
-    }
-    function addSummerConfig() {
-      var start=document.getElementById('sv-start').value, end=document.getElementById('sv-end').value;
-      var activity=document.getElementById('sv-activity').value, max=document.getElementById('sv-max').value;
-      var slot=document.getElementById('sv-slotgroup').value, note=document.getElementById('sv-note').value;
-      if (!start||!end) { showToast('請選擇起始和結束日期。',false,4000); return; }
-      if (start>end)    { showToast('起始日期不可晚於結束日期。',false,4000); return; }
-      if (!activity)    { showToast('請選擇活動。',false,4000); return; }
-      google.script.run
-        .withSuccessHandler(function(msg) {
-          showToast(msg,true,6000); loaded.summer=false; loadSummerConfigs();
-          document.getElementById('sv-start').value=''; document.getElementById('sv-end').value=''; document.getElementById('sv-note').value='';
-        })
-        .withFailureHandler(function(err) { showToast('新增失敗：'+err,false,5000); })
-        .saveAdminSummerConfig(start,end,activity,max,slot,note);
-    }
-    function deleteSummerConfig(rowIndex) {
-      if (!confirm('確定要刪除此寒暑假設定？')) return;
-      google.script.run
-        .withSuccessHandler(function(msg) { showToast(msg,true,5000); loadSummerConfigs(); })
-        .withFailureHandler(function(err) { showToast('刪除失敗：'+err,false,5000); })
-        .deleteAdminSummerConfig(rowIndex);
     }
 
     // ===== 場次設定 =====
@@ -1435,22 +1372,68 @@
     }
     function setupTrigger(){google.script.run.withSuccessHandler(function(msg){showToast(msg,true,8000);}).withFailureHandler(function(err){showToast('設定失敗：'+err,false,5000);}).setupDailyTrigger();}
 
-    // ===== 排班規則 =====
+    // ===== 排班規則（v1.3：含到期日）=====
     function loadRuleActivities(){
       google.script.run
         .withSuccessHandler(function(rules){
-          allRules=rules||{};var sel=document.getElementById('ruleActivity');sel.innerHTML='<option value="">-- 請選擇活動 --</option>';
-          Object.keys(allRules).forEach(function(n){var o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});
-          google.script.run.withSuccessHandler(function(activities){if(!activities)return;activities.forEach(function(act){if(act.name&&!allRules[act.name]){var o=document.createElement('option');o.value=act.name;o.text=act.name;sel.appendChild(o);}});}).getAdminActivities();
+          allRules = rules || {};
+          var sel = document.getElementById('ruleActivity');
+          sel.innerHTML = '<option value="">-- 請選擇活動 --</option>';
+          Object.keys(allRules).forEach(function(n){
+            var o = document.createElement('option');
+            o.value = n;
+            o.text  = n + (allRules[n].expired ? '（已到期）' : '');
+            sel.appendChild(o);
+          });
+          google.script.run.withSuccessHandler(function(activities){
+            if(!activities) return;
+            activities.forEach(function(act){
+              if(act.name && !allRules[act.name]){
+                var o=document.createElement('option'); o.value=act.name; o.text=act.name; sel.appendChild(o);
+              }
+            });
+          }).getAdminActivities();
         })
-        .withFailureHandler(function(err){showToast('載入規則失敗：'+err,false,5000);})
+        .withFailureHandler(function(err){ showToast('載入規則失敗：'+err, false, 5000); })
         .getActivityRules();
     }
-    function loadRuleContent(){var n=document.getElementById('ruleActivity').value;document.getElementById('ruleContent').value=n?(allRules[n]||''):'';}
+
+    function loadRuleContent(){
+      var n = document.getElementById('ruleActivity').value;
+      var r = n ? allRules[n] : null;
+      document.getElementById('ruleContent').value = r ? (r.content || '') : '';
+      document.getElementById('ruleExpiry').value  = r ? (r.expiryForInput || '') : '';
+      refreshRuleBadge();
+    }
+
+    function refreshRuleBadge(){
+      var val   = document.getElementById('ruleExpiry').value;
+      var badge = document.getElementById('ruleExpiryBadge');
+      if(!badge) return;
+      if(!val){ badge.textContent = '永久顯示'; badge.className = 'expiry-badge'; return; }
+      var st = getExpiryStatus(val);
+      badge.textContent = st.label;
+      badge.className   = 'expiry-badge' + (st.cls ? ' ' + st.cls : '');
+    }
+
+    function clearRuleExpiry(){
+      document.getElementById('ruleExpiry').value = '';
+      refreshRuleBadge();
+    }
+
     function saveRule(){
-      var n=document.getElementById('ruleActivity').value,c=document.getElementById('ruleContent').value;
-      if(!n){showToast('請選擇活動。',false,5000);return;}
-      google.script.run.withSuccessHandler(function(msg){allRules[n]=c;showToast(msg,true,8000);}).withFailureHandler(function(err){showToast('儲存失敗：'+err,false,5000);}).saveActivityRule(n,c);
+      var n = document.getElementById('ruleActivity').value;
+      var c = document.getElementById('ruleContent').value;
+      var e = document.getElementById('ruleExpiry').value;
+      if(!n){ showToast('請選擇活動。', false, 5000); return; }
+      google.script.run
+        .withSuccessHandler(function(msg){
+          showToast(msg, true, 8000);
+          loaded.rules = false;
+          loadRuleActivities();
+        })
+        .withFailureHandler(function(err){ showToast('儲存失敗：'+err, false, 5000); })
+        .saveActivityRule(n, c, e);
     }
 
     // ===== 最新活動 =====
@@ -1529,7 +1512,7 @@
           '<td><input type="checkbox" class="cancel-chk-'+containerId+'" value=\''+itemKey.replace(/'/g,"&#39;")+'\'></td>'+
           '<td>'+escHtml(r.activity)+'</td><td>'+escHtml(r.date)+addWeekdayShort(r.date)+'</td><td>'+escHtml(r.slot)+'</td><td>'+escHtml(r.volunteerName)+'</td><td>'+escHtml(r.volunteerId)+'</td>'+
           '<td><button class="btn btn-outline-primary btn-sm" style="font-size:0.78rem;padding:2px 8px;" '+
-            'onclick="showReplaceInput(\''+rowId+'\',\''+r.activity.replace(/'/g,"\\'")+'\',\''+(r.date+' '+r.slot).replace(/'/g,"\\'")+'\',\''+r.volunteerId+'\',\''+escHtml(r.volunteerName)+'\')">換人</button></td></tr>'+
+            'onclick="showReplaceInput(\''+rowId+'\')">換人</button></td></tr>'+
           '<tr id="replace-row-'+rowId+'" style="display:none;background:#f0f6ff;"><td colspan="7" style="padding:10px 14px;">'+
             '<div style="font-size:0.85rem;color:#1565c0;font-weight:bold;margin-bottom:6px;">🔄 代班：將「'+escHtml(r.volunteerName)+'」換為：</div>'+
             '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
@@ -1568,7 +1551,7 @@
       google.script.run
         .withSuccessHandler(function(results){
           var s=0,f=0,msgs=[];results.forEach(function(r){if(r.result.includes('成功')){s++;}else{f++;msgs.push(r.result);}});
-          var sum='取消完成：成功 '+s+' 筆'+(f>0?'，失敗 '+f+' 筆':'')+'.';if(s>0)sum+='\n通知 Email 已自動發送。';if(msgs.length>0)sum+='\n失敗原因：\n'+msgs.join('\n');
+          var sum='取消完成：成功 '+s+' 筆'+(f>0?'，失敗 '+f+' 筆':'')+'。';if(s>0)sum+='\n通知 Email 已自動發送。';if(msgs.length>0)sum+='\n失敗原因：\n'+msgs.join('\n');
           showToast(sum,f===0,f===0?10000:8000);if(containerId==='cancelVolResult')queryByVolunteer();else queryByDate();
         })
         .withFailureHandler(function(err){showToast('取消失敗：'+err,false,6000);})
