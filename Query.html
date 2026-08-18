@@ -23,8 +23,38 @@
 
     .activity-group       { margin-bottom:14px; }
     .activity-group-title { font-weight:bold; color:#0d6efd; margin-bottom:6px; font-size:0.92rem; }
-    .record-item { padding:7px 12px; background:white; border-radius:6px; margin-bottom:5px; font-size:0.88rem; border:1px solid #e9ecef; }
+    .record-item { padding:9px 12px; background:white; border-radius:6px; margin-bottom:6px; font-size:0.88rem; border:1px solid #e9ecef; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .record-main { flex:1; min-width:210px; }
     .total-hours { text-align:right; font-weight:bold; color:#198754; margin-top:10px; font-size:0.95rem; }
+
+    /* ===== 自助取消 ===== */
+    .quota-bar {
+      background:#fff; border:1.5px solid #dee2e6; border-radius:10px;
+      padding:12px 16px; margin-bottom:14px;
+    }
+    .quota-bar.ok      { border-color:#a8d5b5; background:#f4fbf6; }
+    .quota-bar.low     { border-color:#ffe082; background:#fffdf5; }
+    .quota-bar.none    { border-color:#f5c2c7; background:#fff7f7; }
+    .quota-title { font-weight:bold; font-size:0.92rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .quota-dots { display:inline-flex; gap:5px; }
+    .quota-dot { width:14px; height:14px; border-radius:50%; display:inline-block; border:1.5px solid #bbb; }
+    .quota-dot.filled { background:#198754; border-color:#198754; }
+    .quota-dot.filled.low { background:#fd7e14; border-color:#fd7e14; }
+    .quota-dot.empty  { background:#e9ecef; }
+    .quota-sub { font-size:0.8rem; color:#666; margin-top:6px; line-height:1.7; }
+    .quota-sub .contact { color:#c62828; font-weight:bold; }
+
+    .btn-cancel-slot {
+      border:1.5px solid #dc3545; background:white; color:#dc3545;
+      border-radius:6px; padding:3px 12px; font-size:0.8rem; cursor:pointer;
+      white-space:nowrap; transition:all 0.15s;
+    }
+    .btn-cancel-slot:hover { background:#dc3545; color:white; }
+    .btn-cancel-slot.disabled,
+    .btn-cancel-slot:disabled {
+      border-color:#dee2e6; background:#f1f3f5; color:#adb5bd; cursor:not-allowed;
+    }
+    .btn-cancel-slot.disabled:hover { background:#f1f3f5; color:#adb5bd; }
 
     /* 操作紀錄 */
     .log-item { padding:8px 12px; background:white; border-radius:6px; margin-bottom:6px; font-size:0.86rem; border-left:4px solid #dee2e6; }
@@ -34,6 +64,7 @@
     .log-badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-left:6px; }
     .badge-apply  { background:#d1e7dd; color:#0f5132; }
     .badge-cancel { background:#f8d7da; color:#842029; }
+    .badge-self   { background:#fff3cd; color:#856404; }
     .empty-hint { color:#aaa; text-align:center; padding:12px; font-size:0.88rem; }
 
     /* 時數區塊 */
@@ -43,7 +74,6 @@
     .hours-info-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #e9ecef; font-size:0.95rem; }
     .hours-row-label { color:#666; }
     .hours-row-value { font-weight:bold; color:#222; }
-    /* 月份明細表格 */
     .hours-table       { width:100%; border-collapse:collapse; margin-top:14px; font-size:0.9rem; }
     .hours-table thead tr { background:#e9f0ff; color:#0d6efd; }
     .hours-table th    { padding:9px 10px; text-align:center; font-weight:bold; border-bottom:2px solid #c5d8ff; white-space:nowrap; }
@@ -56,7 +86,6 @@
     .hours-table .row-total td { background:#e8f5e9; font-weight:bold; border-top:2px solid #a8d5b5; }
     .hours-table .row-total .total-mins { color:#555; }
     .hours-table .row-total .total-hrs  { color:#198754; font-size:1.05rem; }
-    /* 總計 */
     .hours-grand-total { background:#e8f5e9; border-radius:8px; padding:14px 20px; margin-top:14px; display:flex; justify-content:space-between; align-items:center; }
     .hours-grand-label { color:#555; font-size:0.9rem; }
     .hours-grand-nums  { text-align:right; }
@@ -68,21 +97,32 @@
       display:none; position:fixed; top:30px; left:50%; transform:translateX(-50%);
       min-width:280px; max-width:90%; padding:16px 24px; border-radius:8px;
       font-size:16px; font-weight:bold; text-align:center; z-index:9999;
-      box-shadow:0 4px 12px rgba(0,0,0,0.2); transition:opacity 0.5s ease;
+      box-shadow:0 4px 12px rgba(0,0,0,0.2); transition:opacity 0.5s ease; white-space:pre-line;
     }
     #toast-msg.success { background-color:#d1e7dd; color:#0f5132; border:1px solid #badbcc; }
     #toast-msg.error   { background-color:#f8d7da; color:#842029; border:1px solid #f5c2c7; }
+
+    #cancelOverlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35);
+      z-index:9998; align-items:center; justify-content:center;
+    }
+    #cancelOverlay .box {
+      background:white; border-radius:10px; padding:24px 28px; font-weight:bold; color:#333;
+      box-shadow:0 6px 24px rgba(0,0,0,0.25);
+    }
   </style>
 </head>
 <body>
   <div id="toast-msg"></div>
+  <div id="cancelOverlay"><div class="box">⏳ 處理中，請稍候...</div></div>
+
   <div class="container">
     <button class="back-link" onclick="goBack()">← 返回首頁</button>
 
     <!-- ===== 排班查詢 ===== -->
     <div id="page-schedule" style="display:none;">
       <h2>📅 我的排班查詢</h2>
-      <p class="page-subtitle">查詢個人排班紀錄與操作歷史</p>
+      <p class="page-subtitle">查詢個人排班紀錄，並可自助取消排班</p>
 
       <div class="mb-3">
         <label class="form-label">志工編號：</label>
@@ -96,6 +136,9 @@
       <!-- 結果區 -->
       <div class="result-box" id="scheduleResult">
         <div class="result-title" id="scheduleResultTitle"></div>
+
+        <!-- 自助取消額度 -->
+        <div id="quotaBarWrap"></div>
 
         <!-- 目前有效排班 -->
         <div class="section-label active-label">✅ 目前有效排班（今天起）</div>
@@ -137,9 +180,7 @@
           <div class="hours-info-row"><span class="hours-row-label">姓名</span><span class="hours-row-value" id="hoursName"></span></div>
           <div class="hours-info-row"><span class="hours-row-label">志工編號</span><span class="hours-row-value" id="hoursId"></span></div>
           <div class="hours-info-row"><span class="hours-row-label">查詢期間</span><span class="hours-row-value" id="hoursPeriod"></span></div>
-          <!-- 月份分組動態區 -->
           <div id="hoursMonthlyList"></div>
-          <!-- 總計 -->
           <div class="hours-grand-total" id="hoursGrandTotal" style="display:none">
             <div class="hours-grand-label">合計服勤時數</div>
             <div class="hours-grand-nums">
@@ -156,6 +197,8 @@
 
   <script>
     var s_name = '', h_name = '';
+    var currentCancelInfo = null;   // 目前的取消額度狀態
+    var recordMap = {};             // 取消用的排班資料暫存
 
     window.onload = function() {
       google.script.url.getLocation(function(location) {
@@ -188,14 +231,12 @@
     function querySchedule() {
       var id = document.getElementById('s-id').value.trim();
       if (!id || !s_name) { showToast("請輸入志工編號並確認姓名。", false, 5000); return; }
-
       google.script.run
         .withSuccessHandler(function(result) {
           if (!result) { showToast("查無資料，請確認編號是否正確。", false, 5000); return; }
           renderScheduleResult(result);
         })
         .withFailureHandler(function(err) { showToast("查詢失敗：" + err, false, 5000); })
-        // startMonth / endMonth 傳入固定值（後端以今天為基準篩選）
         .getPersonalSchedule(s_name, id, "2000-01-01", "2099-12-01");
     }
 
@@ -205,21 +246,31 @@
       box.style.display = 'block';
       document.getElementById('scheduleResultTitle').textContent = result.name + ' 的排班查詢結果';
 
+      currentCancelInfo = result.cancelInfo || null;
+      renderQuotaBar(currentCancelInfo);
+
       // 有效排班
       var activeHTML = '';
+      recordMap = {};
       if (!result.activeRecords || result.activeRecords.length === 0) {
         activeHTML = '<div class="empty-hint">今天起無有效排班</div>';
       } else {
         var grouped = {};
-        result.activeRecords.forEach(function(r) {
+        result.activeRecords.forEach(function(r, idx) {
+          r._key = 'rec_' + idx;
+          recordMap[r._key] = r;
           if (!grouped[r.activity]) grouped[r.activity] = [];
           grouped[r.activity].push(r);
         });
         Object.keys(grouped).forEach(function(actName) {
           activeHTML += '<div class="activity-group">';
-          activeHTML += '<div class="activity-group-title">【' + actName + '】</div>';
+          activeHTML += '<div class="activity-group-title">【' + escHtml(actName) + '】</div>';
           grouped[actName].forEach(function(r) {
-            activeHTML += '<div class="record-item">📆 ' + r.date + addWeekday(r.date) + '　' + r.slot + '　(' + r.hours + ' 小時)</div>';
+            activeHTML += '<div class="record-item">' +
+              '<div class="record-main">📆 ' + escHtml(r.date) + addWeekday(r.date) + '　' +
+                escHtml(r.slot) + '　(' + r.hours + ' 小時)</div>' +
+              buildCancelButton(r) +
+            '</div>';
           });
           activeHTML += '</div>';
         });
@@ -232,18 +283,18 @@
       // 操作紀錄
       var logHTML = '';
       if (!result.logRecords || result.logRecords.length === 0) {
-        logHTML = '<div class="empty-hint">今天起無操作紀錄</div>';
+        logHTML = '<div class="empty-hint">無操作紀錄</div>';
       } else {
         result.logRecords.forEach(function(r) {
-          var isApply   = r.operation === '申請排班';
+          var isApply = r.operation === '申請排班';
+          var isSelf  = r.operation.indexOf('自助') >= 0;
           var itemClass = isApply ? 'log-item apply' : 'log-item cancel';
-          var badge     = isApply
-            ? '<span class="log-badge badge-apply">申請</span>'
-            : '<span class="log-badge badge-cancel">取消</span>';
+          var badge;
+          if (isApply)      badge = '<span class="log-badge badge-apply">申請</span>';
+          else if (isSelf)  badge = '<span class="log-badge badge-self">自助取消</span>';
+          else              badge = '<span class="log-badge badge-cancel">取消</span>';
           logHTML += '<div class="' + itemClass + '">' +
-            '<div>' +
-              escHtml(r.activity) + '　' + escHtml(r.slot) + badge +
-            '</div>' +
+            '<div>' + escHtml(r.activity) + '　' + escHtml(r.slot) + badge + '</div>' +
             '<div class="log-meta">🕐 操作時間：' + escHtml(r.opTime) +
               (r.notes ? '　備註：' + escHtml(r.notes) : '') +
             '</div>' +
@@ -251,6 +302,95 @@
         });
       }
       document.getElementById('logRecordsContent').innerHTML = logHTML;
+    }
+
+    // ── 額度狀態列 ────────────────────────────────────────
+    function renderQuotaBar(info) {
+      var wrap = document.getElementById('quotaBarWrap');
+      if (!info) { wrap.innerHTML = ''; return; }
+
+      var cls = info.remaining <= 0 ? 'none' : (info.remaining === 1 ? 'low' : 'ok');
+      var dots = '';
+      for (var i = 0; i < info.max; i++) {
+        if (i < info.remaining) {
+          dots += '<span class="quota-dot filled' + (info.remaining === 1 ? ' low' : '') + '"></span>';
+        } else {
+          dots += '<span class="quota-dot empty"></span>';
+        }
+      }
+
+      var statusText = info.remaining > 0
+        ? '尚可取消 <strong>' + info.remaining + '</strong> 次'
+        : '<strong>已用完</strong>';
+
+      var sub = '每人每月 ' + info.max + ' 次，跨所有活動累計，' + info.resetDate + ' 重置。<br>' +
+                '值勤日前 ' + info.deadlineDays + ' 天內（含當天）不可自助取消。';
+      if (info.remaining <= 0) {
+        sub += '<br><span class="contact">' +
+               (info.contactEmail ? ('如需取消請來信 ' + escHtml(info.contactEmail)) : '如需取消請聯繫管理人員') +
+               '</span>';
+      }
+
+      wrap.innerHTML =
+        '<div class="quota-bar ' + cls + '">' +
+          '<div class="quota-title">🎫 本月自助取消額度：' +
+            '<span class="quota-dots">' + dots + '</span>' +
+            '<span>' + statusText + '</span>' +
+          '</div>' +
+          '<div class="quota-sub">' + sub + '</div>' +
+        '</div>';
+    }
+
+    // ── 取消按鈕（三種狀態）──────────────────────────────
+    function buildCancelButton(r) {
+      var info = currentCancelInfo;
+      // 距離班次太近
+      if (!r.cancelable && r.blockReason === 'deadline') {
+        var d = info ? info.deadlineDays : 7;
+        return '<button class="btn-cancel-slot disabled" disabled title="值勤日前 ' + d + ' 天內不可自助取消">請洽管理員</button>';
+      }
+      // 額度用完
+      if (!info || info.remaining <= 0) {
+        return '<button class="btn-cancel-slot disabled" disabled title="本月自助取消額度已用完">已達上限</button>';
+      }
+      return '<button class="btn-cancel-slot" onclick="confirmCancel(\'' + r._key + '\')">取消</button>';
+    }
+
+    // ── 確認並執行取消 ────────────────────────────────────
+    function confirmCancel(key) {
+      var r = recordMap[key];
+      if (!r) { showToast('資料已過期，請重新查詢。', false, 4000); return; }
+      var info = currentCancelInfo;
+      if (!info || info.remaining <= 0) { showToast('本月自助取消額度已用完。', false, 4000); return; }
+
+      var msg = '確定取消以下排班？\n\n' +
+        '　' + r.activity + '\n' +
+        '　' + r.date + '　' + r.slot + '\n\n' +
+        '⚠️ 這將使用您本月 ' + info.max + ' 次自助取消額度中的 1 次\n' +
+        '（取消後本月剩餘 ' + (info.remaining - 1) + ' 次）\n\n' +
+        '取消後該時段將重新開放給其他志工登記，\n此操作無法復原。';
+      if (!confirm(msg)) return;
+
+      var id = document.getElementById('s-id').value.trim();
+      showOverlay(true);
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          showOverlay(false);
+          if (!res) { showToast('取消失敗：無回應。', false, 5000); return; }
+          showToast(res.message, res.ok, res.ok ? 9000 : 8000);
+          if (res.cancelInfo) currentCancelInfo = res.cancelInfo;
+          querySchedule();   // 重新查詢，更新列表與額度
+        })
+        .withFailureHandler(function(err) {
+          showOverlay(false);
+          showToast('取消失敗：' + err, false, 6000);
+        })
+        .selfCancelSchedule(s_name, id, r.activity, r.date + ' ' + r.slot);
+    }
+
+    function showOverlay(show) {
+      document.getElementById('cancelOverlay').style.display = show ? 'flex' : 'none';
     }
 
     // ── 日期加星期 ────────────────────────────────────────
@@ -293,14 +433,12 @@
           document.getElementById('hoursId').textContent          = id;
           document.getElementById('hoursPeriod').textContent      = result.startMonth + ' 至 ' + result.endMonth;
 
-          // 月份分組
           var listEl = document.getElementById('hoursMonthlyList');
           listEl.innerHTML = '';
           var months = result.monthlyData || [];
           if (months.length === 0) {
             listEl.innerHTML = '<div style="color:#888;padding:16px 0;text-align:center;">此期間無服勤紀錄</div>';
           } else {
-            // 表頭
             var tableHtml = '<table class="hours-table">';
             tableHtml += '<thead><tr>';
             tableHtml += '<th>月份</th><th>值勤日期</th><th>次數</th><th>分鐘</th><th>小時</th>';
@@ -317,7 +455,6 @@
               tableHtml += '<td class="col-hrs">' + m.hours + '</td>';
               tableHtml += '</tr>';
             });
-            // 合計列
             tableHtml += '<tr class="row-total">';
             tableHtml += '<td class="col-month">合計</td>';
             tableHtml += '<td class="col-dates">—</td>';
@@ -329,7 +466,6 @@
             listEl.innerHTML = tableHtml;
           }
 
-          // 總計
           document.getElementById('hoursGrandHr').textContent  = result.grandTotalHours;
           document.getElementById('hoursGrandMin').textContent = result.grandTotalMins;
           document.getElementById('hoursGrandTotal').style.display = 'flex';
@@ -342,8 +478,8 @@
     }
 
     function escHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      if (!str && str !== 0) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     function goBack() { window.location.replace('<?= ScriptApp.getService().getUrl() ?>'); }
